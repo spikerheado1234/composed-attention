@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 #from multi_head_attn import MultiHeadAttention
 from lin_mha import MultiHeadAttention
 import time
+import os
 
 ## Define global vars here. ##
 
@@ -15,8 +16,7 @@ tf.debugging.set_log_device_placement(True)
 
 
 ### Data pipeline preparation
-
-curr_dir = "/Users/Ahan/Desktop/Ahan/UIUC/PL-FOR-NAS/attention/"
+curr_dir = os.getcwd() + "/"
 
 def load_data():
   examples, metadata = tfds.load('ted_hrlr_translate/pt_to_en',
