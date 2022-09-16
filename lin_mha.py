@@ -104,6 +104,17 @@ def _downsample_mat(mat, rand_mat):
             result[i, :, j, :] = output[i, j, :, :]
     return tf.convert_to_tensor(result, dtype=tf.float32)
 
+def _downsampling_shape_correct(mat_shape, rand_mat_shape):
+    """
+    Checks if rand_mat's shape is fit to downsample mat_shape.
+    Since, _build_from_signature does not have access to the keys 
+    we must check this to be sure.
+
+    mat_shape -> (Batch Size, Sequence Length, Num Heads, Inner Dimension)
+    Rand_mat -> (Num Heads, Down Sample Size, Sequence Length)
+    """
+    return mat_shape[1] == rand_mat_shape[2] and mat_shape[2] == rand_mat_shape[0]
+
 def _build_downsample_proj(k, 
                            shape,
                            seed=1):
@@ -113,7 +124,7 @@ def _build_downsample_proj(k,
     k -> dimension of the space you would like to down-sample to.
     shape -> the shape of the randomly generated matrix. Must be a tuple.
     """
-    return tf.Variable(tf.random.normal(shape=shape, mean=0.0, stddev=1/k, seed=seed), trainable=False)
+    return tf.Variable(tf.random.normal(shape=shape, mean=0.0, stddev=1/k, seed=seed, dtype=tf.float32), trainable=False, dtype=tf.float32)
 
 
 def _build_proj_equation(free_dims, bound_dims, output_dims):
@@ -252,7 +263,7 @@ class MultiHeadAttention(Layer):
         activity_regularizer=None,
         kernel_constraint=None,
         bias_constraint=None,
-        downsample_k=3, # We default this value to 256.
+        downsample_k=32, # We default this value to 32.
         **kwargs,
     ):
         super().__init__(**kwargs)
@@ -264,6 +275,8 @@ class MultiHeadAttention(Layer):
         self._use_bias = use_bias
         self._output_shape = output_shape
         self._downsample_k = downsample_k
+        self._rand_mat_keys = False
+        self._rand_mat_values = False
         self._kernel_initializer = initializers.get(kernel_initializer)
         self._bias_initializer = initializers.get(bias_initializer)
         self._kernel_regularizer = regularizers.get(kernel_regularizer)
@@ -357,7 +370,7 @@ class MultiHeadAttention(Layer):
         # to avoid creating symbolic Tensors that will later pollute any eager
         # operations.
         with tf_utils.maybe_init_scope(self):
-            self._rand_mat_keys = _build_downsample_proj(self._downsample_k, (self._num_heads, self._downsample_k, value.shape[1]))
+            self._rand_mat_keys = _build_downsample_proj(self._downsample_k, (self._num_heads, self._downsample_k, key.shape[1]))
             self._rand_mat_values = _build_downsample_proj(self._downsample_k, (self._num_heads, self._downsample_k, value.shape[1]))
             free_dims = self._query_shape.rank - 1
             einsum_equation, bias_axes, output_rank = _build_proj_equation(
@@ -590,6 +603,7 @@ class MultiHeadAttention(Layer):
         training=None,
         use_causal_mask=False,
     ):
+
         attention_mask = self._compute_attention_mask(
             query,
             value,
@@ -630,15 +644,17 @@ class MultiHeadAttention(Layer):
         # `key` = [B, S, N, H]
         key = self._key_dense(key)
 
+        # Before we down-sample we check if random matrix sizes are correct, else we re-modify them.
+        if not _downsampling_shape_correct(key.shape, self._rand_mat_keys.shape):
+            self._rand_mat_keys = _build_downsample_proj(self._downsample_k, (self._num_heads, self._downsample_k, key.shape[1]))
         # We then re-map the product of the keys to downsample.
         key = _downsample_mat(key, self._rand_mat_keys)
 
         # `value` = [B, S, N, H]
         value = self._value_dense(value)
+        if not _downsampling_shape_correct(value.shape, self._rand_mat_values.shape):
+            self._rand_mat_values = _build_downsample_proj(self._downsample_k, (self._num_heads, self._downsample_k, value.shape[1]))
         value = _downsample_mat(value, self._rand_mat_values)
-
-        # We also have to re-map the values to ensure dimensionality matches.
-        # value = _downsample_mat(value, self._rand_mat_values)
 
         # Attention_mask is originally: [1, T, S], must change to: [1, T, K] TODO, check if correct.
         attention_mask = attention_mask[:, :, :self._downsample_k]
