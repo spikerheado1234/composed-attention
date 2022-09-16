@@ -12,8 +12,6 @@ import os
 
 MAX_TOKENS = 128
 
-tf.debugging.set_log_device_placement(True)
-
 
 ### Data pipeline preparation
 curr_dir = os.getcwd() + "/"

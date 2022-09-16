@@ -6,7 +6,6 @@ modify it anyways.
 import collections
 import math
 import string
-from tkinter import W
 
 import numpy as np
 import tensorflow as tf
