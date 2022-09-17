@@ -84,25 +84,15 @@ def _downsample_mat(mat, rand_mat):
     This function down-samples mat using the random matrix rand_mat as described in the 
     Linformer paper.
 
-    Rand_mat should be of size: [N, K, S] -> num heads, down-sample size, sequence length.
+    Rand_mat should be of size: [K, S] -> down-sample size, sequence length.
 
     Returns a down-sampled matrix of size: [B, K, N, H].
     """
-    mat = mat.numpy()
-    output = np.ones(shape=(mat.shape[0], mat.shape[2], mat.shape[1], mat.shape[3]), dtype=np.float32)
-    for i in range(mat.shape[0]): # Per batch size.
-        for j in range(mat.shape[2]): # Per head.
-            output[i, j, :, :] = mat[i, :, j, :]
 
-    # Now output is of size: [B, N, S, H]
-    output = tf.convert_to_tensor(output, dtype=tf.float32)
-    output = tf.einsum('nks, bnsh -> bnkh', rand_mat, output) # Output is of shape: [B, N, K, H] after completing this step.
+    output = tf.einsum('ks, bnsh -> bnkh', rand_mat, mat) # Output is of shape: [B, N, K, H] after completing this step.
     # We then have to return back to the normal shape of: [B, K, N, H]
-    result = np.ones(shape=(output.shape[0], output.shape[2], output.shape[1], output.shape[3]), dtype=np.float32)
-    for i in range(output.shape[0]): # Per batch size.
-        for j in range(output.shape[1]): # Per head.
-            result[i, :, j, :] = output[i, j, :, :]
-    return tf.convert_to_tensor(result, dtype=tf.float32)
+
+    return output
 
 def _downsampling_shape_correct(mat_shape, rand_mat_shape):
     """
@@ -370,8 +360,8 @@ class MultiHeadAttention(Layer):
         # to avoid creating symbolic Tensors that will later pollute any eager
         # operations.
         with tf_utils.maybe_init_scope(self):
-            self._rand_mat_keys = _build_downsample_proj(self._downsample_k, (self._num_heads, self._downsample_k, key.shape[1]))
-            self._rand_mat_values = _build_downsample_proj(self._downsample_k, (self._num_heads, self._downsample_k, value.shape[1]))
+            self._rand_mat_keys = _build_downsample_proj(self._downsample_k, (self._downsample_k, key.shape[1]))
+            self._rand_mat_values = _build_downsample_proj(self._downsample_k, (self._downsample_k, value.shape[1]))
             free_dims = self._query_shape.rank - 1
             einsum_equation, bias_axes, output_rank = _build_proj_equation(
                 free_dims, bound_dims=1, output_dims=2
@@ -646,14 +636,14 @@ class MultiHeadAttention(Layer):
 
         # Before we down-sample we check if random matrix sizes are correct, else we re-modify them.
         if not _downsampling_shape_correct(key.shape, self._rand_mat_keys.shape):
-            self._rand_mat_keys = _build_downsample_proj(self._downsample_k, (self._num_heads, self._downsample_k, key.shape[1]))
+            self._rand_mat_keys = _build_downsample_proj(self._downsample_k, (self._downsample_k, key.shape[1]))
         # We then re-map the product of the keys to downsample.
         key = _downsample_mat(key, self._rand_mat_keys)
 
         # `value` = [B, S, N, H]
         value = self._value_dense(value)
         if not _downsampling_shape_correct(value.shape, self._rand_mat_values.shape):
-            self._rand_mat_values = _build_downsample_proj(self._downsample_k, (self._num_heads, self._downsample_k, value.shape[1]))
+            self._rand_mat_values = _build_downsample_proj(self._downsample_k, (self._downsample_k, value.shape[1]))
         value = _downsample_mat(value, self._rand_mat_values)
 
         # Attention_mask is originally: [1, T, S], must change to: [1, T, K] TODO, check if correct.
