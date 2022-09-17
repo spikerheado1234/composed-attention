@@ -5,6 +5,7 @@ import tensorflow_text
 import time
 import argparse
 from stats import Stats 
+import os
 
 ## Define argument parsing and help over here. ##
 
@@ -20,7 +21,7 @@ MAX_TOKENS = 128
 
 ### Data preparation 
 
-curr_dir = "/Users/Ahan/Desktop/Ahan/UIUC/PL-FOR-NAS/attention/"
+curr_dir = os.getcwd() + "/"
 
 def load_data():
   examples, metadata = tfds.load('ted_hrlr_translate/pt_to_en',
