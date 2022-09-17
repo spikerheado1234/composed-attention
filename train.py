@@ -175,7 +175,7 @@ def train_step(inputs, labels):
   train_loss(loss)
   train_accuracy(accuracy_function(tar_real, predictions))
 
-EPOCHS = 20
+EPOCHS = 100
 
 for epoch in range(EPOCHS):
   start = time.time()
