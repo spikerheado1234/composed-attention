@@ -4,16 +4,15 @@ import tensorflow_datasets as tfds
 import tensorflow_text
 import time
 import argparse
+from stats import Stats 
 
 ## Define argument parsing and help over here. ##
 
-print('getting executed')
 parser = argparse.ArgumentParser(description='Train compositions of efficient Transformer Variants.')
 parser.add_argument('--type', dest='attention_type', default='MHA', choices=['MHA', 'LinMHA', 'PerfMHA'], help='The type of attention mechanism you wish to train a Transformer on. (Possible Values are: MHA, LinMHA or PerfMHA)')
 parser.add_argument('--downsampling_k', dest='downsampling_k', default=32, type=int, help='The dimension you wish to downsample the sequence length to in accordance to the LinFormer Paper.')
 
 args = parser.parse_args()
-print(args.attention_type)
 
 ## Define global vars here. ##
 
@@ -190,8 +189,11 @@ for epoch in range(EPOCHS):
 
     print(f'Epoch {epoch + 1} Batch {batch} Loss {train_loss.result():.4f} Accuracy {train_accuracy.result():.4f}')
 
-    with open('./data.txt', 'a+') as f:
+    with open('./train_data.txt', 'a+') as f:
       f.write(f'{train_loss.result():.4f} {train_accuracy.result():.4f}\n')
+
+    with open('./train_stats.txt', 'a+') as f:
+        f.write(f'MHA {Stats.mha_time:.4f} FFN {Stats.ffn_time:.4f} Downsampling {Stats.downsampling_time:.4f}\n')
 
   if (epoch + 1) % 5 == 0:
     ckpt_save_path = ckpt_manager.save()

@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 from multi_head_attn import MultiHeadAttention as MHA
 from lin_mha import MultiHeadAttention as LinMHA
 import time
+from stats import Stats 
 
 def get_angles(pos, i, d_model):
   angle_rates = 1 / np.power(10000, (2 * (i//2)) / np.float32(d_model))
@@ -102,6 +103,7 @@ class EncoderLayer(tf.keras.layers.Layer):
       attention_mask = None
 
     # Multi-head self-attention output (`tf.keras.layers.MultiHeadAttention `).
+    mha_start = time.time()
     attn_output = self.mha(
         query=x,  # Query Q tensor.
         value=x,  # Value V tensor.
@@ -109,12 +111,16 @@ class EncoderLayer(tf.keras.layers.Layer):
         attention_mask=attention_mask, # A boolean mask that prevents attention to certain positions.
         training=training, # A boolean indicating whether the layer should behave in training mode.
         )
-
+    mha_end = time.time()
+    Stats.mha_time += (mha_end - mha_start)
     # Multi-head self-attention output after layer normalization and a residual/skip connection.
     out1 = self.layernorm1(x + attn_output)  # Shape `(batch_size, input_seq_len, d_model)`
 
     # Point-wise feed-forward network output.
+    ffn_start = time.time()
     ffn_output = self.ffn(out1)  # Shape `(batch_size, input_seq_len, d_model)`
+    ffn_end = time.time()
+    Stats.ffn_time += (ffn_end - ffn_start)
     ffn_output = self.dropout1(ffn_output, training=training)
     # Point-wise feed-forward network output after layer normalization and a residual skip connection.
     out2 = self.layernorm2(out1 + ffn_output)  # Shape `(batch_size, input_seq_len, d_model)`.
@@ -260,6 +266,7 @@ class DecoderLayer(tf.keras.layers.Layer):
       attention_mask = mask1 & mask2
 
     # Multi-head cross-attention output (`tf.keras.layers.MultiHeadAttention `).
+    mha_start = time.time()
     attn_cross, attn_weights_cross = self.mha_cross(
         query=out1,
         value=enc_output,
@@ -268,12 +275,17 @@ class DecoderLayer(tf.keras.layers.Layer):
         return_attention_scores=True,  # Shape `(batch_size, target_seq_len, d_model)`.
         training=training  # A boolean indicating whether the layer should behave in training mode.
     )
+    mha_end = time.time()
+    Stats.mha_time += mha_end - mha_start
 
     # Multi-head cross-attention output after layer normalization and a residual/skip connection.
     out2 = self.layernorm2(attn_cross + out1)  # (batch_size, target_seq_len, d_model)
 
     # Point-wise feed-forward network output.
+    ffn_start = time.time()
     ffn_output = self.ffn(out2)  # Shape `(batch_size, target_seq_len, d_model)`.
+    ffn_end = time.time()
+    Stats.mha_time += ffn_end - ffn_start
     ffn_output = self.dropout1(ffn_output, training=training)
     out3 = self.layernorm3(ffn_output + out2)  # Shape `(batch_size, target_seq_len, d_model)`.
 

@@ -7,6 +7,7 @@ import collections
 import math
 import string
 from tkinter import W
+import time
 
 import numpy as np
 import tensorflow as tf
@@ -23,6 +24,8 @@ from keras.utils import tf_utils
 # isort: off
 from tensorflow.python.platform import tf_logging as logging
 from tensorflow.python.util.tf_export import keras_export
+
+from stats import Stats
 
 _CHR_IDX = string.ascii_lowercase
 
@@ -592,6 +595,7 @@ class MultiHeadAttention(Layer):
         # `key` = [B, S, N, H]
         key = self._key_dense(key)
 
+        downsampling_time_start = time.time()
         # Before we down-sample we check if random matrix sizes are correct, else we re-modify them.
         if not _downsampling_shape_correct(key.shape, self._rand_mat_keys.shape):
             self._rand_mat_keys = _build_downsample_proj(self._downsample_k, (self._downsample_k, key.shape[1]))
@@ -603,6 +607,8 @@ class MultiHeadAttention(Layer):
         if not _downsampling_shape_correct(value.shape, self._rand_mat_values.shape):
             self._rand_mat_values = _build_downsample_proj(self._downsample_k, (self._downsample_k, value.shape[1]))
         value = _downsample_mat(value, self._rand_mat_values)
+        downsampling_time_end = time.time()
+        Stats.downsampling_time += downsampling_time_end - downsampling_time_start
 
         # Attention_mask is originally: [1, T, S], must change to: [1, T, K] TODO, check if correct.
         attention_mask = attention_mask[:, :, :self._downsample_k]
