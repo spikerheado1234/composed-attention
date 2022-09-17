@@ -375,16 +375,6 @@ class MultiHeadAttention(Layer):
                 name="query",
                 **self._get_common_kwargs_for_sublayer(),
             )
-            ## TODO, check if this is correct. ##
-            #self._query_dense = core.EinsumDense(
-            #    einsum_equation,
-            #    output_shape=_get_output_shape(
-            #        output_rank - 1, [self._num_heads, self._key_dim]
-            #    ),
-            #    bias_axes=bias_axes if self._use_bias else None,
-            #    name="query",
-            #    **self._get_common_kwargs_for_sublayer(),
-            #)
             einsum_equation, bias_axes, output_rank = _build_proj_equation(
                 self._key_shape.rank - 1, bound_dims=1, output_dims=2
             )
@@ -397,16 +387,6 @@ class MultiHeadAttention(Layer):
                 name="key",
                 **self._get_common_kwargs_for_sublayer(),
             )
-            ## TODO, ensure this is correct. ##
-            #self._key_dense = core.EinsumDense(
-            #    einsum_equation,
-            #    output_shape=_get_output_shape(
-            #        output_rank - 1, [self._num_heads, self._key_dim]
-            #    ),
-            #    bias_axes=bias_axes if self._use_bias else None,
-            #    name="key",
-            #    **self._get_common_kwargs_for_sublayer(),
-            #)
             einsum_equation, bias_axes, output_rank = _build_proj_equation(
                 self._value_shape.rank - 1, bound_dims=1, output_dims=2
             )
@@ -419,20 +399,6 @@ class MultiHeadAttention(Layer):
                 name="value",
                 **self._get_common_kwargs_for_sublayer(),
             )
-            ## TODO, ensure that this is correct. ##
-            #self._value_dense = core.EinsumDense(
-            #    einsum_equation,
-            #    output_shape=_get_output_shape(
-            #        output_rank - 1, [self._num_heads, self._value_dim]
-            #    ),
-            #    bias_axes=bias_axes if self._use_bias else None,
-            #    name="value",
-            #    **self._get_common_kwargs_for_sublayer(),
-            #)
-
-            # Builds the attention computations for multi-head dot product
-            # attention.  These computations could be wrapped into the keras
-            # attention layer once it supports mult-head einsum computations.
             self._build_attention(output_rank)
             self._output_dense = self._make_output_dense(
                 free_dims,
@@ -487,14 +453,6 @@ class MultiHeadAttention(Layer):
             name=name,
             **common_kwargs,
         )
-        ## TODO, ensure that this is correct. ##
-        #return core.EinsumDense(
-        #    einsum_equation,
-        #    output_shape=_get_output_shape(output_rank - 1, output_shape),
-        #    bias_axes=bias_axes if self._use_bias else None,
-        #    name=name,
-        #    **common_kwargs,
-        #)
 
     def _build_attention(self, rank):
         """Builds multi-head dot-product attention computations.
