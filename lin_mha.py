@@ -6,6 +6,7 @@ modify it anyways.
 import collections
 import math
 import string
+import time
 
 import numpy as np
 import tensorflow as tf
@@ -22,6 +23,8 @@ from keras.utils import tf_utils
 # isort: off
 from tensorflow.python.platform import tf_logging as logging
 from tensorflow.python.util.tf_export import keras_export
+
+from stats import Stats
 
 _CHR_IDX = string.ascii_lowercase
 
@@ -83,25 +86,15 @@ def _downsample_mat(mat, rand_mat):
     This function down-samples mat using the random matrix rand_mat as described in the 
     Linformer paper.
 
-    Rand_mat should be of size: [N, K, S] -> num heads, down-sample size, sequence length.
+    Rand_mat should be of size: [K, S] -> down-sample size, sequence length.
 
     Returns a down-sampled matrix of size: [B, K, N, H].
     """
-    mat = mat.numpy()
-    output = np.ones(shape=(mat.shape[0], mat.shape[2], mat.shape[1], mat.shape[3]), dtype=np.float32)
-    for i in range(mat.shape[0]): # Per batch size.
-        for j in range(mat.shape[2]): # Per head.
-            output[i, j, :, :] = mat[i, :, j, :]
 
-    # Now output is of size: [B, N, S, H]
-    output = tf.convert_to_tensor(output, dtype=tf.float32)
-    output = tf.einsum('nks, bnsh -> bnkh', rand_mat, output) # Output is of shape: [B, N, K, H] after completing this step.
+    output = tf.einsum('ks, bsnh -> bknh', rand_mat, mat) # Output is of shape: [B, N, K, H] after completing this step.
     # We then have to return back to the normal shape of: [B, K, N, H]
-    result = np.ones(shape=(output.shape[0], output.shape[2], output.shape[1], output.shape[3]), dtype=np.float32)
-    for i in range(output.shape[0]): # Per batch size.
-        for j in range(output.shape[1]): # Per head.
-            result[i, :, j, :] = output[i, j, :, :]
-    return tf.convert_to_tensor(result, dtype=tf.float32)
+
+    return output
 
 def _downsampling_shape_correct(mat_shape, rand_mat_shape):
     """
@@ -110,9 +103,9 @@ def _downsampling_shape_correct(mat_shape, rand_mat_shape):
     we must check this to be sure.
 
     mat_shape -> (Batch Size, Sequence Length, Num Heads, Inner Dimension)
-    Rand_mat -> (Num Heads, Down Sample Size, Sequence Length)
+    Rand_mat -> (Down Sample Size, Sequence Length)
     """
-    return mat_shape[1] == rand_mat_shape[2] and mat_shape[2] == rand_mat_shape[0]
+    return mat_shape[1] == rand_mat_shape[1] 
 
 def _build_downsample_proj(k, 
                            shape,
@@ -262,7 +255,7 @@ class MultiHeadAttention(Layer):
         activity_regularizer=None,
         kernel_constraint=None,
         bias_constraint=None,
-        downsample_k=32, # We default this value to 32.
+        downsample_k=32, # We default this value to 32. (Currently half the batch size.)
         **kwargs,
     ):
         super().__init__(**kwargs)
@@ -369,8 +362,8 @@ class MultiHeadAttention(Layer):
         # to avoid creating symbolic Tensors that will later pollute any eager
         # operations.
         with tf_utils.maybe_init_scope(self):
-            self._rand_mat_keys = _build_downsample_proj(self._downsample_k, (self._num_heads, self._downsample_k, key.shape[1]))
-            self._rand_mat_values = _build_downsample_proj(self._downsample_k, (self._num_heads, self._downsample_k, value.shape[1]))
+            self._rand_mat_keys = _build_downsample_proj(self._downsample_k, (self._downsample_k, key.shape[1]))
+            self._rand_mat_values = _build_downsample_proj(self._downsample_k, (self._downsample_k, value.shape[1]))
             free_dims = self._query_shape.rank - 1
             einsum_equation, bias_axes, output_rank = _build_proj_equation(
                 free_dims, bound_dims=1, output_dims=2
@@ -384,16 +377,6 @@ class MultiHeadAttention(Layer):
                 name="query",
                 **self._get_common_kwargs_for_sublayer(),
             )
-            ## TODO, check if this is correct. ##
-            #self._query_dense = core.EinsumDense(
-            #    einsum_equation,
-            #    output_shape=_get_output_shape(
-            #        output_rank - 1, [self._num_heads, self._key_dim]
-            #    ),
-            #    bias_axes=bias_axes if self._use_bias else None,
-            #    name="query",
-            #    **self._get_common_kwargs_for_sublayer(),
-            #)
             einsum_equation, bias_axes, output_rank = _build_proj_equation(
                 self._key_shape.rank - 1, bound_dims=1, output_dims=2
             )
@@ -406,16 +389,6 @@ class MultiHeadAttention(Layer):
                 name="key",
                 **self._get_common_kwargs_for_sublayer(),
             )
-            ## TODO, ensure this is correct. ##
-            #self._key_dense = core.EinsumDense(
-            #    einsum_equation,
-            #    output_shape=_get_output_shape(
-            #        output_rank - 1, [self._num_heads, self._key_dim]
-            #    ),
-            #    bias_axes=bias_axes if self._use_bias else None,
-            #    name="key",
-            #    **self._get_common_kwargs_for_sublayer(),
-            #)
             einsum_equation, bias_axes, output_rank = _build_proj_equation(
                 self._value_shape.rank - 1, bound_dims=1, output_dims=2
             )
@@ -428,20 +401,6 @@ class MultiHeadAttention(Layer):
                 name="value",
                 **self._get_common_kwargs_for_sublayer(),
             )
-            ## TODO, ensure that this is correct. ##
-            #self._value_dense = core.EinsumDense(
-            #    einsum_equation,
-            #    output_shape=_get_output_shape(
-            #        output_rank - 1, [self._num_heads, self._value_dim]
-            #    ),
-            #    bias_axes=bias_axes if self._use_bias else None,
-            #    name="value",
-            #    **self._get_common_kwargs_for_sublayer(),
-            #)
-
-            # Builds the attention computations for multi-head dot product
-            # attention.  These computations could be wrapped into the keras
-            # attention layer once it supports mult-head einsum computations.
             self._build_attention(output_rank)
             self._output_dense = self._make_output_dense(
                 free_dims,
@@ -496,14 +455,6 @@ class MultiHeadAttention(Layer):
             name=name,
             **common_kwargs,
         )
-        ## TODO, ensure that this is correct. ##
-        #return core.EinsumDense(
-        #    einsum_equation,
-        #    output_shape=_get_output_shape(output_rank - 1, output_shape),
-        #    bias_axes=bias_axes if self._use_bias else None,
-        #    name=name,
-        #    **common_kwargs,
-        #)
 
     def _build_attention(self, rank):
         """Builds multi-head dot-product attention computations.
@@ -643,17 +594,20 @@ class MultiHeadAttention(Layer):
         # `key` = [B, S, N, H]
         key = self._key_dense(key)
 
+        downsampling_time_start = time.time()
         # Before we down-sample we check if random matrix sizes are correct, else we re-modify them.
         if not _downsampling_shape_correct(key.shape, self._rand_mat_keys.shape):
-            self._rand_mat_keys = _build_downsample_proj(self._downsample_k, (self._num_heads, self._downsample_k, key.shape[1]))
+            self._rand_mat_keys = _build_downsample_proj(self._downsample_k, (self._downsample_k, key.shape[1]))
         # We then re-map the product of the keys to downsample.
         key = _downsample_mat(key, self._rand_mat_keys)
 
         # `value` = [B, S, N, H]
         value = self._value_dense(value)
         if not _downsampling_shape_correct(value.shape, self._rand_mat_values.shape):
-            self._rand_mat_values = _build_downsample_proj(self._downsample_k, (self._num_heads, self._downsample_k, value.shape[1]))
+            self._rand_mat_values = _build_downsample_proj(self._downsample_k, (self._downsample_k, value.shape[1]))
         value = _downsample_mat(value, self._rand_mat_values)
+        downsampling_time_end = time.time()
+        Stats.downsampling_time += downsampling_time_end - downsampling_time_start
 
         # Attention_mask is originally: [1, T, S], must change to: [1, T, K] TODO, check if correct.
         attention_mask = attention_mask[:, :, :self._downsample_k]
