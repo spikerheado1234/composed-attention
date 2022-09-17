@@ -6,7 +6,6 @@ modify it anyways.
 import collections
 import math
 import string
-from tkinter import W
 import time
 
 import numpy as np
