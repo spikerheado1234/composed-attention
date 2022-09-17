@@ -89,7 +89,7 @@ def _downsample_mat(mat, rand_mat):
     Returns a down-sampled matrix of size: [B, K, N, H].
     """
 
-    output = tf.einsum('ks, bnsh -> bnkh', rand_mat, mat) # Output is of shape: [B, N, K, H] after completing this step.
+    output = tf.einsum('ks, bsnh -> bknh', rand_mat, mat) # Output is of shape: [B, N, K, H] after completing this step.
     # We then have to return back to the normal shape of: [B, K, N, H]
 
     return output
@@ -101,9 +101,9 @@ def _downsampling_shape_correct(mat_shape, rand_mat_shape):
     we must check this to be sure.
 
     mat_shape -> (Batch Size, Sequence Length, Num Heads, Inner Dimension)
-    Rand_mat -> (Num Heads, Down Sample Size, Sequence Length)
+    Rand_mat -> (Down Sample Size, Sequence Length)
     """
-    return mat_shape[1] == rand_mat_shape[2] and mat_shape[2] == rand_mat_shape[0]
+    return mat_shape[1] == rand_mat_shape[1] 
 
 def _build_downsample_proj(k, 
                            shape,
@@ -253,7 +253,7 @@ class MultiHeadAttention(Layer):
         activity_regularizer=None,
         kernel_constraint=None,
         bias_constraint=None,
-        downsample_k=32, # We default this value to 32.
+        downsample_k=32, # We default this value to 32. (Currently half the batch size.)
         **kwargs,
     ):
         super().__init__(**kwargs)
