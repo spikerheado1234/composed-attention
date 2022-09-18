@@ -105,7 +105,7 @@ def _downsampling_shape_correct(mat_shape, rand_mat_shape):
     mat_shape -> (Batch Size, Sequence Length, Num Heads, Inner Dimension)
     Rand_mat -> (Down Sample Size, Sequence Length)
     """
-    return mat_shape[1] == rand_mat_shape[1] # and rand_mat_shape[0] < mat_shape[1] 
+    return mat_shape[1] == rand_mat_shape[1] and rand_mat_shape[0] < mat_shape[1] 
 
 def _build_downsample_proj(k, 
                            shape,
@@ -597,14 +597,14 @@ class MultiHeadAttention(Layer):
         downsampling_time_start = time.time()
         # Before we down-sample we check if random matrix sizes are correct, else we re-modify them.
         if not _downsampling_shape_correct(key.shape, self._rand_mat_keys.shape):
-            self._rand_mat_keys = _build_downsample_proj(self._downsample_k, (self._downsample_k, key.shape[1]))
+            self._rand_mat_keys = _build_downsample_proj(self._downsample_k, (key.shape[1] // 2, key.shape[1]))
         # We then re-map the product of the keys to downsample.
         key = _downsample_mat(key, self._rand_mat_keys)
 
         # `value` = [B, S, N, H]
         value = self._value_dense(value)
         if not _downsampling_shape_correct(value.shape, self._rand_mat_values.shape):
-            self._rand_mat_values = _build_downsample_proj(self._downsample_k, (self._downsample_k, value.shape[1]))
+            self._rand_mat_values = _build_downsample_proj(self._downsample_k, (value.shape[1] // 2, value.shape[1]))
         value = _downsample_mat(value, self._rand_mat_values)
         downsampling_time_end = time.time()
         Stats.downsampling_time += downsampling_time_end - downsampling_time_start
