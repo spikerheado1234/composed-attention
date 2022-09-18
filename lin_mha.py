@@ -105,7 +105,7 @@ def _downsampling_shape_correct(mat_shape, rand_mat_shape):
     mat_shape -> (Batch Size, Sequence Length, Num Heads, Inner Dimension)
     Rand_mat -> (Down Sample Size, Sequence Length)
     """
-    return mat_shape[1] == rand_mat_shape[1] and rand_mat_shape[0] < mat_shape[1] 
+    return mat_shape[1] == rand_mat_shape[1] # and rand_mat_shape[0] < mat_shape[1] 
 
 def _build_downsample_proj(k, 
                            shape,

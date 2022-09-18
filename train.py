@@ -165,6 +165,8 @@ def train_step(inputs, labels):
   (inp, tar_inp) = inputs
   tar_real = labels
 
+  print(inp.shape)
+  print(tar_inp.shape)
   with tf.GradientTape() as tape:
     predictions, _ = transformer([inp, tar_inp],
                                  training = True)
