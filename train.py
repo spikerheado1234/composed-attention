@@ -162,13 +162,14 @@ train_step_signature = [
 ]
 
 def pad_vector(inputs):
-  global MAX_TOKENS, BATCH_SIZE
+  global MAX_TOKENS 
   """
   Pads the vector inputs (of size (BATCH_SIZE, SEQUENCE LENGTH)) to ensure each
   sequence length is standardized to MAX_TOKENS.
   """
   max_seq_len = inputs.shape[1]
-  zero_vector = tf.zeros(shape=(BATCH_SIZE, MAX_TOKENS - max_seq_len), dtype=tf.int64)
+  current_batch_size = inputs.shape[0]
+  zero_vector = tf.zeros(shape=(current_batch_size, MAX_TOKENS - max_seq_len), dtype=tf.int64)
 
   result = tf.concat([inputs, zero_vector], axis=1)
   return result
