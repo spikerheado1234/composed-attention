@@ -594,23 +594,24 @@ class MultiHeadAttention(Layer):
         # `key` = [B, S, N, H]
         key = self._key_dense(key)
 
+        # `value` = [B, S, N, H]
+        value = self._value_dense(value)
+
         downsampling_time_start = time.time()
         # Before we down-sample we check if random matrix sizes are correct, else we re-modify them.
         if not _downsampling_shape_correct(key.shape, self._rand_mat_keys.shape) or not _downsampling_shape_correct(value.shape, self._rand_mat_values.shape):
-            self._rand_mat_keys = _build_downsample_proj(key.shape[1] // 2, (key.shape[1] // 2, key.shape[1]))
-            self._rand_mat_values = _build_downsample_proj(value.shape[1] // 2, (value.shape[1] // 2, value.shape[1]))
+            self._rand_mat_keys = _build_downsample_proj(self._downsample_k, (self._downsample_k, key.shape[1]))
+            self._rand_mat_values = _build_downsample_proj(self._downsample_k, (self._downsample_k, value.shape[1]))
 
         # We then re-map the product of the keys to downsample.
         key = _downsample_mat(key, self._rand_mat_keys)
 
-        # `value` = [B, S, N, H]
-        value = self._value_dense(value)
         value = _downsample_mat(value, self._rand_mat_values)
         downsampling_time_end = time.time()
         Stats.downsampling_time += downsampling_time_end - downsampling_time_start
 
         # Attention_mask is originally: [1, T, S], must change to: [1, T, K] TODO, check if correct.
-        attention_mask = attention_mask[:, :, :self._rand_mat_keys.shape[0]]
+        attention_mask = attention_mask[:, :, :self._downsample_k]
         attention_output, attention_scores = self._compute_attention(
             query, key, value, attention_mask, training
         )

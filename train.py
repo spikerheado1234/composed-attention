@@ -161,9 +161,25 @@ train_step_signature = [
     tf.TensorSpec(shape=(None, None), dtype=tf.int64),
 ]
 
+def pad_vector(inputs):
+  global MAX_TOKENS, BATCH_SIZE
+  """
+  Pads the vector inputs (of size (BATCH_SIZE, SEQUENCE LENGTH)) to ensure each
+  sequence length is standardized to MAX_TOKENS.
+  """
+  max_seq_len = inputs.shape[1]
+  zero_vector = tf.zeros(shape=(BATCH_SIZE, MAX_TOKENS - max_seq_len), dtype=tf.int64)
+
+  result = tf.concat([inputs, zero_vector], axis=1)
+  return result
+
 def train_step(inputs, labels):
   (inp, tar_inp) = inputs
   tar_real = labels
+
+  inp = pad_vector(inp)
+  tar_inp = pad_vector(tar_inp)
+  tar_real = pad_vector(tar_real)
 
   with tf.GradientTape() as tape:
     predictions, _ = transformer([inp, tar_inp],
@@ -178,6 +194,7 @@ def train_step(inputs, labels):
 
 EPOCHS = 30
 
+train_start = time.time()
 for epoch in range(EPOCHS):
   start = time.time()
 
@@ -204,3 +221,7 @@ for epoch in range(EPOCHS):
   print(f'Epoch {epoch + 1} Loss {train_loss.result():.4f} Accuracy {train_accuracy.result():.4f}')
 
   print(f'Time taken for 1 epoch: {time.time() - start:.2f} secs\n')
+
+train_end = time.time()
+
+print(f'Total training time: {train_end-train_start}\n')
