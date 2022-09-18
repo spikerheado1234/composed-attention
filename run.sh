@@ -2,6 +2,6 @@
 
 source env/bin/activate
 
-python3 --type MHA > output.in 2> err.in
+python3 train.py --type LinMHA --downsampling_k 40 > output.in 2> err.in
 
-source deactivate
+deactivate
