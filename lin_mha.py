@@ -597,14 +597,14 @@ class MultiHeadAttention(Layer):
         downsampling_time_start = time.time()
         # Before we down-sample we check if random matrix sizes are correct, else we re-modify them.
         if not _downsampling_shape_correct(key.shape, self._rand_mat_keys.shape):
-            self._rand_mat_keys = _build_downsample_proj(self._downsample_k, (key.shape[1] // 2, key.shape[1]))
+            self._rand_mat_keys = _build_downsample_proj(key.shape[1] // 2, (key.shape[1] // 2, key.shape[1]))
         # We then re-map the product of the keys to downsample.
         key = _downsample_mat(key, self._rand_mat_keys)
 
         # `value` = [B, S, N, H]
         value = self._value_dense(value)
         if not _downsampling_shape_correct(value.shape, self._rand_mat_values.shape):
-            self._rand_mat_values = _build_downsample_proj(self._downsample_k, (value.shape[1] // 2, value.shape[1]))
+            self._rand_mat_values = _build_downsample_proj(value.shape[1] // 2, (value.shape[1] // 2, value.shape[1]))
         value = _downsample_mat(value, self._rand_mat_values)
         downsampling_time_end = time.time()
         Stats.downsampling_time += downsampling_time_end - downsampling_time_start
