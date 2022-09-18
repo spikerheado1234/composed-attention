@@ -610,7 +610,7 @@ class MultiHeadAttention(Layer):
         Stats.downsampling_time += downsampling_time_end - downsampling_time_start
 
         # Attention_mask is originally: [1, T, S], must change to: [1, T, K] TODO, check if correct.
-        attention_mask = attention_mask[:, :, :self.rand_mat_keys.shape[0]]
+        attention_mask = attention_mask[:, :, :self._rand_mat_keys.shape[0]]
         attention_output, attention_scores = self._compute_attention(
             query, key, value, attention_mask, training
         )
