@@ -5,6 +5,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from multi_head_attn import MultiHeadAttention as MHA
 from lin_mha import MultiHeadAttention as LinMHA
+from fast_attention.fast_mha import Attention as PerfMHA
 import time
 from stats import Stats 
 
@@ -74,6 +75,11 @@ class EncoderLayer(tf.keras.layers.Layer):
           key_dim=d_model, # Size of each attention head for query Q and key K.
           dropout=dropout_rate,
           downsample_k=downsampling_value
+          )
+    elif attention_type == 'PerfMHA':
+          self.mha = PerfMHA(hidden_size=d_model,
+          num_heads=num_attention_heads,
+          attention_dropout=dropout_rate
           )
     else: # Default to normal attention.
       self.mha = MHA(
@@ -209,6 +215,19 @@ class DecoderLayer(tf.keras.layers.Layer):
           dropout=dropout_rate,
           downsample_k=downsampling_value
       )
+    elif attention_type == 'PerfMHA':
+      self.mha_masked = PerfMHA(
+          hidden_size=d_model,
+          num_heads=num_attention_heads,
+          attention_dropout=dropout_rate,
+          causal=True
+          )
+      self.mha_cross = PerfMHA(
+          hidden_size=d_model,
+          num_heads=num_attention_heads,
+          attention_dropout=dropout_rate,
+          causal=False
+          )
     else:
       self.mha_masked = MHA(
           num_heads=num_attention_heads,
