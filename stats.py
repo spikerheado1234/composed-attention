@@ -12,3 +12,6 @@ class Stats:
 
     ## For LinFormer. ##
     downsampling_time = 0 # Time spent down_sampling the matrix.
+
+    ## For PerFormer. ##
+    transformation_time = 0 # Time taken to map queries and keys to another domain.

@@ -20,6 +20,8 @@ import math
 import numpy as np
 import tensorflow as tf
 import fast_attention.util as util 
+from stats import Stats 
+import time
 
 BIG_CONSTANT = 1e8
 
@@ -315,9 +317,12 @@ def favor_attention(query,
   Returns:
     FAVOR normalized attention.
   """
+  transformation_start = time.time()
   query_prime = kernel_transformation(query, True,
                                       projection_matrix)  # [B,L,H,M]
   key_prime = kernel_transformation(key, False, projection_matrix)  # [B,L,H,M]
+  transformation_end = time.time()
+  Stats.transformation_time += (transformation_end - transformation_start)
   query_prime = tf.transpose(query_prime, [1, 0, 2, 3])  # [L,B,H,M]
   key_prime = tf.transpose(key_prime, [1, 0, 2, 3])  # [L,B,H,M]
   value = tf.transpose(value, [1, 0, 2, 3])  # [L,B,H,D]
