@@ -212,7 +212,7 @@ for epoch in range(EPOCHS):
       f.write(f'{train_loss.result():.4f} {train_accuracy.result():.4f}\n')
 
     with open('./train_stats.txt', 'a+') as f:
-        f.write(f'MHA {Stats.mha_time:.4f} FFN {Stats.ffn_time:.4f} Downsampling {Stats.downsampling_time:.4f}\n')
+        f.write(f'MHA {Stats.mha_time:.4f} MHA-Enc {Stats.mha_enc_time} MHA-Causal {Stats.mha_causal_time} MHA-Enc-Dec {Stats.mha_enc_dec_time} FFN {Stats.ffn_time:.4f} Downsampling {Stats.downsampling_time:.4f}\n')
 
   if (epoch + 1) % 5 == 0:
     ckpt_save_path = ckpt_manager.save()

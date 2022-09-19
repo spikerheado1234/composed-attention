@@ -109,7 +109,7 @@ class EncoderLayer(tf.keras.layers.Layer):
       attention_mask = None
 
     # Multi-head self-attention output (`tf.keras.layers.MultiHeadAttention `).
-    mha_start = time.time()
+    mha_enc_start = time.time()
     attn_output = self.mha(
         query=x,  # Query Q tensor.
         value=x,  # Value V tensor.
@@ -117,8 +117,9 @@ class EncoderLayer(tf.keras.layers.Layer):
         attention_mask=attention_mask, # A boolean mask that prevents attention to certain positions.
         training=training, # A boolean indicating whether the layer should behave in training mode.
         )
-    mha_end = time.time()
-    Stats.mha_time += (mha_end - mha_start)
+    mha_enc_end = time.time()
+    Stats.mha_time += (mha_enc_end - mha_enc_start)
+    Stats.mha_enc_time += mha_enc_end - mha_enc_start
     # Multi-head self-attention output after layer normalization and a residual/skip connection.
     out1 = self.layernorm1(x + attn_output)  # Shape `(batch_size, input_seq_len, d_model)`
 
@@ -264,6 +265,7 @@ class DecoderLayer(tf.keras.layers.Layer):
       self_attention_mask = mask1 & mask2
 
     # Masked multi-head self-attention output (`tf.keras.layers.MultiHeadAttention`).
+    mha_causal_start = time.time()
     attn_masked, attn_weights_masked = self.mha_masked(
         query=x,
         value=x,
@@ -273,6 +275,9 @@ class DecoderLayer(tf.keras.layers.Layer):
         return_attention_scores=True,  # Shape `(batch_size, target_seq_len, d_model)`.
         training=training  # A boolean indicating whether the layer should behave in training mode.
         )
+    mha_causal_end = time.time()
+    Stats.mha_time += mha_causal_end - mha_causal_start
+    Stats.mha_causal_time += mha_causal_end - mha_causal_start
 
     # Masked multi-head self-attention output after layer normalization and a residual/skip connection.
     out1 = self.layernorm1(attn_masked + x)
@@ -285,7 +290,7 @@ class DecoderLayer(tf.keras.layers.Layer):
       attention_mask = mask1 & mask2
 
     # Multi-head cross-attention output (`tf.keras.layers.MultiHeadAttention `).
-    mha_start = time.time()
+    mha_enc_dec_start = time.time()
     attn_cross, attn_weights_cross = self.mha_cross(
         query=out1,
         value=enc_output,
@@ -294,8 +299,9 @@ class DecoderLayer(tf.keras.layers.Layer):
         return_attention_scores=True,  # Shape `(batch_size, target_seq_len, d_model)`.
         training=training  # A boolean indicating whether the layer should behave in training mode.
     )
-    mha_end = time.time()
-    Stats.mha_time += mha_end - mha_start
+    mha_enc_dec_end = time.time()
+    Stats.mha_time += mha_enc_dec_end - mha_enc_dec_start 
+    Stats.mha_enc_dec_time += mha_enc_dec_end - mha_enc_dec_start
 
     # Multi-head cross-attention output after layer normalization and a residual/skip connection.
     out2 = self.layernorm2(attn_cross + out1)  # (batch_size, target_seq_len, d_model)
