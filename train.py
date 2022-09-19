@@ -206,7 +206,7 @@ for epoch in range(EPOCHS):
   for (batch, (inp, tar)) in enumerate(train_batches):
     train_step(inp, tar)
 
-    print(f'Epoch {epoch + 1} Batch {batch} Loss {train_loss.result():.4f} Accuracy {train_accuracy.result():.4f}')
+    print(f'Epoch {epoch + 1} Batch {batch} Loss {train_loss.result():.4f} Accuracy {train_accuracy.result():.4f}', flush=True)
 
     with open('./train_data.txt', 'a+') as f:
       f.write(f'{train_loss.result():.4f} {train_accuracy.result():.4f}\n')
@@ -216,13 +216,13 @@ for epoch in range(EPOCHS):
 
   if (epoch + 1) % 5 == 0:
     ckpt_save_path = ckpt_manager.save()
-    print(f'Saving checkpoint for epoch {epoch+1} at {ckpt_save_path}')
+    print(f'Saving checkpoint for epoch {epoch+1} at {ckpt_save_path}', flush=True)
 
 
-  print(f'Epoch {epoch + 1} Loss {train_loss.result():.4f} Accuracy {train_accuracy.result():.4f}')
+  print(f'Epoch {epoch + 1} Loss {train_loss.result():.4f} Accuracy {train_accuracy.result():.4f}', flush=True)
 
-  print(f'Time taken for 1 epoch: {time.time() - start:.2f} secs\n')
+  print(f'Time taken for 1 epoch: {time.time() - start:.2f} secs\n', flush=True)
 
 train_end = time.time()
 
-print(f'Total training time: {train_end-train_start}\n')
+print(f'Total training time: {train_end-train_start}\n', flush=True)
