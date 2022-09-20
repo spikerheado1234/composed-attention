@@ -223,12 +223,19 @@ class DecoderLayer(tf.keras.layers.Layer):
           attention_dropout=dropout_rate,
           causal=True
           )
-      self.mha_cross = PerfMHA(
-          hidden_size=d_model,
+      # Let's try and see if this crazy idea works! 
+      #self.mha_cross = PerfMHA(
+      #    hidden_size=d_model,
+      #    num_heads=num_attention_heads,
+      #    attention_dropout=dropout_rate,
+      #    causal=False
+      #    )
+      # Multi-head cross-attention.
+      self.mha_cross = MHA(
           num_heads=num_attention_heads,
-          attention_dropout=dropout_rate,
-          causal=False
-          )
+          key_dim=d_model, # Size of each attention head for query Q and key K.
+          dropout=dropout_rate
+      )
     else:
       self.mha_masked = MHA(
           num_heads=num_attention_heads,
