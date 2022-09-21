@@ -217,12 +217,19 @@ class DecoderLayer(tf.keras.layers.Layer):
           downsample_k=downsampling_value
       )
     elif attention_type == 'PerfMHA':
-      self.mha_masked = PerfMHA(
-          hidden_size=d_model,
+      # Lets try this crazy idea!
+      self.mha_masked = MHA(
           num_heads=num_attention_heads,
-          attention_dropout=dropout_rate,
-          causal=True
-          )
+          key_dim=d_model, # Size of each attention head for query Q and key K.
+          dropout=dropout_rate
+      )
+      #self.mha_masked = PerfMHA(
+      #    hidden_size=d_model,
+      #    num_heads=num_attention_heads,
+      #    attention_dropout=dropout_rate,
+      #    causal=True
+      #    )
+      # Let's try and see if this crazy idea works! 
       self.mha_cross = PerfMHA(
           hidden_size=d_model,
           num_heads=num_attention_heads,
