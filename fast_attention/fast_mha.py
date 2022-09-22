@@ -223,7 +223,7 @@ def causal_numerator(qs, ks, vs):
   sums = tf.zeros_like(tf.einsum("ijk,ijl->ijkl", ks[0], vs[0]))
 
   for index in range(qs.shape[0]):
-    sums = sums + tf.einsum("ijk,ijl->ijkl", ks[index], vs[index])
+    sums = sums + tf.einsum("ijk,ijl->ijkl", ks[index], vs[index]) # What is this einsum doing?
     result.append(tf.einsum("ijkl,ijk->ijl", sums, qs[index])[None, Ellipsis])
 
   result = tf.concat(result, axis=0)

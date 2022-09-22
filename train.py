@@ -17,7 +17,7 @@ args = parser.parse_args()
 
 ## Define global vars here. ##
 
-MAX_TOKENS = 128
+MAX_TOKENS = 1024
 
 ### Data preparation 
 
