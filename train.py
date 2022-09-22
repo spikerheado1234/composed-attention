@@ -17,7 +17,7 @@ args = parser.parse_args()
 
 ## Define global vars here. ##
 
-MAX_TOKENS = 512
+MAX_TOKENS = 1024
 
 ### Data preparation 
 
@@ -62,7 +62,7 @@ def prepare_batch(pt, en):
   return (pt, en_inputs), en_labels
 
 BUFFER_SIZE = 20000
-BATCH_SIZE = 32
+BATCH_SIZE = 16
 
 def make_batches(ds):
   return (
