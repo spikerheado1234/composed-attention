@@ -218,7 +218,7 @@ def train_step_prac(inputs, labels):
   optimizer.apply_gradients(zip(gradients, transformer.trainable_variables))
 
 repititions = 100
-exp_file = curr_dir + "/data/benchmarks/" + args.attention_type + f"/{BATCH_SIZE}bs_{MAX_TOKENS}sl_{num_layers}nl_data.txt"
+exp_file = curr_dir + "data/benchmarks/" + args.attention_type + f"/{BATCH_SIZE}bs_{MAX_TOKENS}sl_{num_layers}nl_data.txt"
 
 train_start = time.time()
 for (batch, (inp, tar)) in enumerate(train_batches):
@@ -228,18 +228,19 @@ for (batch, (inp, tar)) in enumerate(train_batches):
     try:
       train_step_prac(inp, tar)
     except Exception:
-      with open(exp_file, "w+") as f:
+      with open(exp_file, "a+") as f:
         f.write(f'Exception encountered, probably OOM\n')
       raise Exception
 
-    with open(exp_file, "w+") as f:
-      f.write(f'MHA {Stats.mha_time:.4f} MHA-Enc {Stats.mha_enc_time:.4f} MHA-Causal {Stats.mha_causal_time:.4f} MHA-Enc-Dec {Stats.mha_enc_dec_time:.4f} FFN {Stats.ffn_time:.4f} Downsampling {Stats.downsampling_time:.4f} Kernel-Transformation {Stats.transformation_time:.4f}\n')
-
   # We only want to run the same data over and over again.
   break
+
+with open(exp_file, "a+") as f:
+  f.write(f'MHA {Stats.mha_time:.4f} MHA-Enc {Stats.mha_enc_time:.4f} MHA-Causal {Stats.mha_causal_time:.4f} MHA-Enc-Dec {Stats.mha_enc_dec_time:.4f} FFN {Stats.ffn_time:.4f} Downsampling {Stats.downsampling_time:.4f} Kernel-Transformation {Stats.transformation_time:.4f}\n')
+
 train_end = time.time()
 
-with open(exp_file, "w+") as f:
+with open(exp_file, "a+") as f:
   f.write(f'End-to-End: {train_end - train_start}\n')
 
 ## The code has finished here.
