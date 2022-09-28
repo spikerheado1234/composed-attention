@@ -2,9 +2,9 @@
 
 # For now, we have a tapered down version
 models=("MHA" "LinMHA" "PerfMHA")
-layers=(2 4)
-batchSizes=(2 4)
-sequenceLengths=(2 4)
+layers=(2 4 8 16 32 64)
+batchSizes=(2 4 8 16 32 64 128 256 512 1024)
+sequenceLengths=(2 4 8 16 32 64 128 256 512 1024)
 
 source env/bin/activate
 
