@@ -12,12 +12,15 @@ import os
 parser = argparse.ArgumentParser(description='Train compositions of efficient Transformer Variants.')
 parser.add_argument('--type', dest='attention_type', default='MHA', choices=['MHA', 'LinMHA', 'PerfMHA'], help='The type of attention mechanism you wish to train a Transformer on. (Possible Values are: MHA, LinMHA or PerfMHA)')
 parser.add_argument('--downsampling_k', dest='downsampling_k', default=32, type=int, help='The dimension you wish to downsample the sequence length to in accordance to the LinFormer Paper.')
+parser.add_argument('--batch_size', dest='batch_size', default=64, type=int, help='the batch size used for training & inference purposes')
+parser.add_argument('--layers', dest='layers', default=4, type=int, help='the number of layers in the transformer.')
+parser.add_argument('--sequence_length', dest='sequence_length', type=int, default=128, help='the sequence length of the input to the transformer')
 
 args = parser.parse_args()
 
 ## Define global vars here. ##
 
-MAX_TOKENS = 512
+MAX_TOKENS = args.sequence_length
 
 ### Data preparation 
 
@@ -62,7 +65,7 @@ def prepare_batch(pt, en):
   return (pt, en_inputs), en_labels
 
 BUFFER_SIZE = 20000
-BATCH_SIZE = 8
+BATCH_SIZE = args.batch_size
 
 def make_batches(ds):
   return (
@@ -78,7 +81,7 @@ train_batches = make_batches(train_examples)
 val_batches = make_batches(val_examples)
 
 ## Hyperparameters ##
-num_layers = 4
+num_layers = args.layers
 d_model = 128
 dff = 512
 num_attention_heads = 8
@@ -196,6 +199,53 @@ def train_step(inputs, labels):
 EPOCHS = 30
 
 train_start = time.time()
+
+## This is the code for the benchmarking experiment.
+def train_step_prac(inputs, labels):
+  (inp, tar_inp) = inputs
+  tar_real = labels
+
+  inp = pad_vector(inp)
+  tar_inp = pad_vector(tar_inp)
+  tar_real = pad_vector(tar_real)
+
+  with tf.GradientTape() as tape:
+    predictions, _ = transformer([inp, tar_inp],
+                                 training = True)
+    loss = loss_function(tar_real, predictions)
+
+  gradients = tape.gradient(loss, transformer.trainable_variables)
+  optimizer.apply_gradients(zip(gradients, transformer.trainable_variables))
+
+repititions = 100
+exp_file = curr_dir + "/data/benchmarks/" + args.attention_type + f"/{BATCH_SIZE}bs_{MAX_TOKENS}sl_{num_layers}nl_data.txt"
+
+train_start = time.time()
+for (batch, (inp, tar)) in enumerate(train_batches):
+
+  # We basically run the same batch over and over again 100 times.
+  for _ in range(repititions):
+    try:
+      train_step_prac(inp, tar)
+    except Exception:
+      with open(exp_file, "w+") as f:
+        f.write(f'Exception encountered, probably OOM\n')
+      raise Exception
+
+    with open(exp_file, "w+") as f:
+      f.write(f'MHA {Stats.mha_time:.4f} MHA-Enc {Stats.mha_enc_time:.4f} MHA-Causal {Stats.mha_causal_time:.4f} MHA-Enc-Dec {Stats.mha_enc_dec_time:.4f} FFN {Stats.ffn_time:.4f} Downsampling {Stats.downsampling_time:.4f} Kernel-Transformation {Stats.transformation_time:.4f}\n')
+
+  # We only want to run the same data over and over again.
+  break
+train_end = time.time()
+
+with open(exp_file, "w+") as f:
+  f.write(f'End-to-End: {train_end - train_start}\n')
+
+## The code has finished here.
+
+"""
+Actual training loop, put it back into the code post inference experiment.
 for epoch in range(EPOCHS):
   start = time.time()
 
@@ -226,3 +276,4 @@ for epoch in range(EPOCHS):
 train_end = time.time()
 
 print(f'Total training time: {train_end-train_start}\n', flush=True)
+"""
