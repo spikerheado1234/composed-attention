@@ -1,0 +1,2 @@
+MHA 9.2840 MHA-Enc 2.6595 MHA-Causal 2.8789 MHA-Enc-Dec 2.4443 FFN 1.3212 Downsampling 0.0000 Kernel-Transformation 0.0000
+End-to-End: 44.26200532913208
