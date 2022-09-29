@@ -11,7 +11,7 @@ for model in ${models[@]}; do
     for layer in ${layers[@]}; do
         for batchSize in ${batchSizes[@]}; do
             for sequenceLength in ${sequenceLengths[@]}; do
-                python3 train.py --type ${model} --downsampling_k $((sequenceLength / 2)) --batch_size ${batchSize} --layers ${layer} --sequence_length ${sequenceLength} > output_perf.in 2> err_perf.in;
+                python3 benchmark.py --type ${model} --downsampling_k $((sequenceLength / 2)) --batch_size ${batchSize} --layers ${layer} --sequence_length ${sequenceLength} > output_perf.in 2> err_perf.in;
 		        echo "model: ${model}, layer: ${layer}, batch size: ${batchSize}, sequence length: ${sequenceLength} finished"
             done 
         done

@@ -10,7 +10,7 @@ import os
 ## Define argument parsing and help over here. ##
 
 parser = argparse.ArgumentParser(description='Train compositions of efficient Transformer Variants.')
-parser.add_argument('--type', dest='attention_type', default='MHA', choices=['MHA', 'LinMHA', 'PerfMHA', 'CompMHA'], help='The type of attention mechanism you wish to train a Transformer on. (Possible Values are: MHA, LinMHA or PerfMHA)')
+parser.add_argument('--type', dest='attention_type', default='MHA', choices=['MHA', 'LinMHA', 'PerfMHA'], help='The type of attention mechanism you wish to train a Transformer on. (Possible Values are: MHA, LinMHA or PerfMHA)')
 parser.add_argument('--downsampling_k', dest='downsampling_k', default=32, type=int, help='The dimension you wish to downsample the sequence length to in accordance to the LinFormer Paper.')
 parser.add_argument('--batch_size', dest='batch_size', default=64, type=int, help='the batch size used for training & inference purposes')
 parser.add_argument('--layers', dest='layers', default=4, type=int, help='the number of layers in the transformer.')
@@ -192,7 +192,10 @@ def pad_vector(inputs):
   result = tf.concat([inputs, zero_vector], axis=1)
   return result
 
-def train_step(inputs, labels):
+train_start = time.time()
+
+## This is the code for the benchmarking experiment.
+def train_step_prac(inputs, labels):
   (inp, tar_inp) = inputs
   tar_real = labels
 
@@ -208,39 +211,28 @@ def train_step(inputs, labels):
   gradients = tape.gradient(loss, transformer.trainable_variables)
   optimizer.apply_gradients(zip(gradients, transformer.trainable_variables))
 
-  train_loss(loss)
-  train_accuracy(accuracy_function(tar_real, predictions))
-
-EPOCHS = 30
+repititions = 100
+exp_file = curr_dir + "data/benchmarks/" + args.attention_type + f"/{BATCH_SIZE}bs_{MAX_TOKENS}sl_{num_layers}nl_data.txt"
 
 train_start = time.time()
-for epoch in range(EPOCHS):
-  start = time.time()
+for (batch, (inp, tar)) in enumerate(train_batches):
 
-  train_loss.reset_states()
-  train_accuracy.reset_states()
+  # We basically run the same batch over and over again 100 times.
+  for _ in range(repititions):
+    try:
+      train_step_prac(inp, tar)
+    except Exception:
+      with open(exp_file, "a+") as f:
+        f.write(f'Exception encountered, probably OOM\n')
+      raise Exception
 
-  # inp -> portuguese, tar -> english
-  for (batch, (inp, tar)) in enumerate(train_batches):
-    train_step(inp, tar)
+  # We only want to run the same data over and over again.
+  break
 
-    print(f'Epoch {epoch + 1} Batch {batch} Loss {train_loss.result():.4f} Accuracy {train_accuracy.result():.4f}', flush=True)
-
-    with open('./train_data.txt', 'a+') as f:
-      f.write(f'{train_loss.result():.4f} {train_accuracy.result():.4f}\n')
-
-    with open('./train_stats.txt', 'a+') as f:
-        f.write(f'MHA {Stats.mha_time:.4f} MHA-Enc {Stats.mha_enc_time:.4f} MHA-Causal {Stats.mha_causal_time:.4f} MHA-Enc-Dec {Stats.mha_enc_dec_time:.4f} FFN {Stats.ffn_time:.4f} Downsampling {Stats.downsampling_time:.4f} Kernel-Transformation {Stats.transformation_time:.4f}\n')
-
-  if (epoch + 1) % 5 == 0:
-    ckpt_save_path = ckpt_manager.save()
-    print(f'Saving checkpoint for epoch {epoch+1} at {ckpt_save_path}', flush=True)
-
-
-  print(f'Epoch {epoch + 1} Loss {train_loss.result():.4f} Accuracy {train_accuracy.result():.4f}', flush=True)
-
-  print(f'Time taken for 1 epoch: {time.time() - start:.2f} secs\n', flush=True)
+with open(exp_file, "a+") as f:
+  f.write(f'MHA {Stats.mha_time:.4f} MHA-Enc {Stats.mha_enc_time:.4f} MHA-Causal {Stats.mha_causal_time:.4f} MHA-Enc-Dec {Stats.mha_enc_dec_time:.4f} FFN {Stats.ffn_time:.4f} Downsampling {Stats.downsampling_time:.4f} Kernel-Transformation {Stats.transformation_time:.4f}\n')
 
 train_end = time.time()
 
-print(f'Total training time: {train_end-train_start}\n', flush=True)
+with open(exp_file, "a+") as f:
+  f.write(f'End-to-End: {train_end - train_start}\n')
