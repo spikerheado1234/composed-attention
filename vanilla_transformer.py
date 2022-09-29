@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 from multi_head_attn import MultiHeadAttention as MHA
 from lin_mha import MultiHeadAttention as LinMHA
 from fast_attention.fast_mha import Attention as PerfMHA
+from composed_mha import Attention as CompMHA
 import time
 from stats import Stats 
 
@@ -77,10 +78,16 @@ class EncoderLayer(tf.keras.layers.Layer):
           downsample_k=downsampling_value
           )
     elif attention_type == 'PerfMHA':
-          self.mha = PerfMHA(hidden_size=d_model,
+      self.mha = PerfMHA(hidden_size=d_model,
           num_heads=num_attention_heads,
           attention_dropout=dropout_rate
           )
+    elif attention_type == 'CompMHA':
+      self.mha = CompMHA(hidden_size=d_model,
+          num_heads=num_attention_heads,
+          attention_dropout=dropout_rate,
+          downsample_k=downsampling_value
+        )
     else: # Default to normal attention.
       self.mha = MHA(
           num_heads=num_attention_heads,
@@ -217,24 +224,38 @@ class DecoderLayer(tf.keras.layers.Layer):
           downsample_k=downsampling_value
       )
     elif attention_type == 'PerfMHA':
-      # Lets try this crazy idea!
-      self.mha_masked = MHA(
+      self.mha_masked = PerfMHA(
+          hidden_size=d_model,
           num_heads=num_attention_heads,
-          key_dim=d_model, # Size of each attention head for query Q and key K.
-          dropout=dropout_rate
-      )
-      #self.mha_masked = PerfMHA(
-      #    hidden_size=d_model,
-      #    num_heads=num_attention_heads,
-      #    attention_dropout=dropout_rate,
-      #    causal=True
-      #    )
-      # Let's try and see if this crazy idea works! 
+          attention_dropout=dropout_rate,
+          causal=True
+          )
       self.mha_cross = PerfMHA(
           hidden_size=d_model,
           num_heads=num_attention_heads,
           attention_dropout=dropout_rate,
           causal=False
+          )
+    elif attention_type == 'CompMHA':
+      self.mha_masked = MHA(
+          num_heads=num_attention_heads,
+          key_dim=d_model, # Size of each attention head for query Q and key K.
+          dropout=dropout_rate
+      )
+      ## FOR NOW WE USE REGULAR MHA to see how good this performs.
+      #self.mha_masked = CompMHA(
+      #    hidden_size=d_model,
+      #    num_heads=num_attention_heads,
+      #    attention_dropout=dropout_rate,
+      #    causal=True,
+      #    downsample_k=downsampling_value
+      #    )
+      self.mha_cross = CompMHA(
+          hidden_size=d_model,
+          num_heads=num_attention_heads,
+          attention_dropout=dropout_rate,
+          causal=False,
+          downsample_k=downsampling_value
           )
     else:
       self.mha_masked = MHA(
