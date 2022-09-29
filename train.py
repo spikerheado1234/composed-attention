@@ -28,6 +28,8 @@ if gpus:
       tf.config.set_visible_devices(gpus[1], 'GPU') 
     elif args.attention_type == 'PerfMHA' and len(gpus) > 2:
       tf.config.set_visible_devices(gpus[2], 'GPU')
+    elif args.attention_type == 'CompMHA' and len(gpus) > 3:
+      tf.config.set_visible_devices(gpus[3], 'GPU')
     else:
       tf.config.set_visible_devices(gpus[0], 'GPU')
   except RuntimeError as e:
