@@ -18,6 +18,21 @@ parser.add_argument('--sequence_length', dest='sequence_length', type=int, defau
 
 args = parser.parse_args()
 
+gpus = tf.config.list_physical_devices('GPU')
+
+if gpus:
+  try:
+    if args.attention_type == 'MHA':
+      tf.config.set_visible_devices(gpus[0], 'GPU')
+    elif args.attention_type == 'LinMHA' and len(gpus) > 1:
+      tf.config.set_visible_devices(gpus[1], 'GPU') 
+    elif args.attention_type == 'PerfMHA' and len(gpus) > 2:
+      tf.config.set_visible_devices(gpus[2], 'GPU')
+    else:
+      tf.config.set_visible_devices(gpus[0], 'GPU')
+  except RuntimeError as e:
+    print(e)
+
 ## Define global vars here. ##
 
 MAX_TOKENS = args.sequence_length
