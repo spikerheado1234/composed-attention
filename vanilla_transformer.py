@@ -237,12 +237,13 @@ class DecoderLayer(tf.keras.layers.Layer):
           causal=False
           )
     elif attention_type == 'CompMHA':
-      self.mha_masked = MHA(
+      self.mha_masked = LinMHA(
           num_heads=num_attention_heads,
           key_dim=d_model, # Size of each attention head for query Q and key K.
-          dropout=dropout_rate
+          dropout=dropout_rate,
+          downsample_k=downsampling_value
       )
-      ## FOR NOW WE USE REGULAR MHA to see how good this performs.
+      ## FOR NOW WE USE the LinFormerMHA to see how good this performs.
       #self.mha_masked = CompMHA(
       #    hidden_size=d_model,
       #    num_heads=num_attention_heads,
