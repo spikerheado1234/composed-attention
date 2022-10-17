@@ -99,9 +99,9 @@ val_batches = make_batches(val_examples)
 
 ## Hyperparameters ##
 num_layers = args.layers
-d_model = 128
-dff = 512
-num_attention_heads = 8
+d_model = 1024
+dff = 3074
+num_attention_heads = 16
 dropout_rate = 0.1
 
 transformer = Transformer(
