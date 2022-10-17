@@ -18,22 +18,8 @@ parser.add_argument('--sequence_length', dest='sequence_length', type=int, defau
 
 args = parser.parse_args()
 
-gpus = tf.config.list_physical_devices('GPU')
-
-if gpus:
-  try:
-    if args.attention_type == 'MHA':
-      tf.config.set_visible_devices(gpus[0], 'GPU')
-    elif args.attention_type == 'LinMHA' and len(gpus) > 1:
-      tf.config.set_visible_devices(gpus[1], 'GPU') 
-    elif args.attention_type == 'PerfMHA' and len(gpus) > 2:
-      tf.config.set_visible_devices(gpus[2], 'GPU')
-    elif args.attention_type == 'CompMHA' and len(gpus) > 3:
-      tf.config.set_visible_devices(gpus[3], 'GPU')
-    else:
-      tf.config.set_visible_devices(gpus[0], 'GPU')
-  except RuntimeError as e:
-    print(e)
+# Should set to distributed data parallel automatically.
+mirrored_strategy = tf.distribute.MirroredStrategy()
 
 ## Define global vars here. ##
 
