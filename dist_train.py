@@ -18,6 +18,9 @@ parser.add_argument('--sequence_length', dest='sequence_length', type=int, defau
 
 args = parser.parse_args()
 
+## This is the strategy that we will use.
+strategy = tf.distribute.MirroredStrategy()
+
 ## Define global vars here. ##
 
 MAX_TOKENS = args.sequence_length
@@ -82,21 +85,23 @@ val_batches = make_batches(val_examples)
 
 ## Hyperparameters ##
 num_layers = args.layers
-d_model = 1024
-dff = 3074
-num_attention_heads = 16
+#d_model = 1024
+d_model = 512
+dff = 512
+num_attention_heads = 8
 dropout_rate = 0.1
 
-transformer = Transformer(
-    num_layers=num_layers,
-    d_model=d_model,
-    num_attention_heads=num_attention_heads,
-    dff=dff,
-    input_vocab_size=tokenizers.pt.get_vocab_size().numpy(),
-    target_vocab_size=tokenizers.en.get_vocab_size().numpy(),
-    dropout_rate=dropout_rate,
-    downsampling_value=args.downsampling_k if args.attention_type == 'LinMHA' else 32, # Just default to 32 otherwise, doesn't matter since it won't be used.
-    attention_type=args.attention_type)
+with strategy.scope():
+  transformer = Transformer(
+      num_layers=num_layers,
+      d_model=d_model,
+      num_attention_heads=num_attention_heads,
+      dff=dff,
+      input_vocab_size=tokenizers.pt.get_vocab_size().numpy(),
+      target_vocab_size=tokenizers.en.get_vocab_size().numpy(),
+      dropout_rate=dropout_rate,
+      downsampling_value=args.downsampling_k if args.attention_type == 'LinMHA' else 32, # Just default to 32 otherwise, doesn't matter since it won't be used.
+      attention_type=args.attention_type)
 
 class CustomSchedule(tf.keras.optimizers.schedules.LearningRateSchedule):
   def __init__(self, d_model, warmup_steps=4000):
@@ -114,9 +119,10 @@ class CustomSchedule(tf.keras.optimizers.schedules.LearningRateSchedule):
     return tf.math.rsqrt(self.d_model) * tf.math.minimum(arg1, arg2)
 
 
-learning_rate = CustomSchedule(d_model)
-optimizer = tf.keras.optimizers.Adam(learning_rate, beta_1=0.9, beta_2=0.98,
-                                    epsilon=1e-9)
+with strategy.scope():
+  learning_rate = CustomSchedule(d_model)
+  optimizer = tf.keras.optimizers.Adam(learning_rate, beta_1=0.9, beta_2=0.98,
+                                      epsilon=1e-9)
 
 loss_object = tf.keras.losses.SparseCategoricalCrossentropy(
     from_logits=True, reduction='none')
@@ -176,13 +182,17 @@ def pad_vector(inputs):
   result = tf.concat([inputs, zero_vector], axis=1)
   return result
 
-def train_step(inputs, labels):
+def train_step(inputs, labels, is_dist=True):
   (inp, tar_inp) = inputs
   tar_real = labels
 
   inp = pad_vector(inp)
   tar_inp = pad_vector(tar_inp)
   tar_real = pad_vector(tar_real)
+  if is_dist:
+    inp = strategy.experimental_distribute_dataset(inp)
+    tar_inp = strategy.experimental_distribute_dataset(tar_inp)
+    tar_real = strategy.experimental_distribute_dataset(tar_real)
 
   with tf.GradientTape() as tape:
     predictions, _ = transformer([inp, tar_inp],
@@ -192,38 +202,45 @@ def train_step(inputs, labels):
   gradients = tape.gradient(loss, transformer.trainable_variables)
   optimizer.apply_gradients(zip(gradients, transformer.trainable_variables))
 
-  train_loss(loss)
-  train_accuracy(accuracy_function(tar_real, predictions))
+  if not is_dist: # Otherwise we will show the accuracy and loss somewhere else.
+    train_loss(loss)
+    train_accuracy(accuracy_function(tar_real, predictions))
+
+  return loss
 
 EPOCHS = 30
 
 train_start = time.time()
-for epoch in range(EPOCHS):
-  start = time.time()
+def train_func(is_dist=False):
+  for epoch in range(EPOCHS):
+    start = time.time()
 
-  train_loss.reset_states()
-  train_accuracy.reset_states()
+    train_loss.reset_states()
+    train_accuracy.reset_states()
 
-  # inp -> portuguese, tar -> english
-  for (batch, (inp, tar)) in enumerate(train_batches):
-    train_step(inp, tar)
+    # inp -> portuguese, tar -> english
+    for (batch, (inp, tar)) in enumerate(train_batches):
+      train_step(inp, tar, is_dist)
 
-    print(f'Epoch {epoch + 1} Batch {batch} Loss {train_loss.result():.4f} Accuracy {train_accuracy.result():.4f}', flush=True)
+      print(f'Epoch {epoch + 1} Batch {batch} Loss {train_loss.result():.4f} Accuracy {train_accuracy.result():.4f}', flush=True)
 
-    with open('./train_data.txt', 'a+') as f:
-      f.write(f'{train_loss.result():.4f} {train_accuracy.result():.4f}\n')
+      with open('./train_data.txt', 'a+') as f:
+        f.write(f'{train_loss.result():.4f} {train_accuracy.result():.4f}\n')
 
-    with open('./train_stats.txt', 'a+') as f:
-        f.write(f'MHA {Stats.mha_time:.4f} MHA-Enc {Stats.mha_enc_time:.4f} MHA-Causal {Stats.mha_causal_time:.4f} MHA-Enc-Dec {Stats.mha_enc_dec_time:.4f} FFN {Stats.ffn_time:.4f} Downsampling {Stats.downsampling_time:.4f} Kernel-Transformation {Stats.transformation_time:.4f}\n')
+      with open('./train_stats.txt', 'a+') as f:
+          f.write(f'MHA {Stats.mha_time:.4f} MHA-Enc {Stats.mha_enc_time:.4f} MHA-Causal {Stats.mha_causal_time:.4f} MHA-Enc-Dec {Stats.mha_enc_dec_time:.4f} FFN {Stats.ffn_time:.4f} Downsampling {Stats.downsampling_time:.4f} Kernel-Transformation {Stats.transformation_time:.4f}\n')
 
-  if (epoch + 1) % 5 == 0:
-    ckpt_save_path = ckpt_manager.save()
-    print(f'Saving checkpoint for epoch {epoch+1} at {ckpt_save_path}', flush=True)
+    if (epoch + 1) % 5 == 0:
+      ckpt_save_path = ckpt_manager.save()
+      print(f'Saving checkpoint for epoch {epoch+1} at {ckpt_save_path}', flush=True)
 
 
-  print(f'Epoch {epoch + 1} Loss {train_loss.result():.4f} Accuracy {train_accuracy.result():.4f}', flush=True)
+    print(f'Epoch {epoch + 1} Loss {train_loss.result():.4f} Accuracy {train_accuracy.result():.4f}', flush=True)
 
-  print(f'Time taken for 1 epoch: {time.time() - start:.2f} secs\n', flush=True)
+    print(f'Time taken for 1 epoch: {time.time() - start:.2f} secs\n', flush=True)
+
+is_dist = False
+train_func()
 
 train_end = time.time()
 
