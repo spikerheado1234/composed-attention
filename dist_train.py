@@ -123,9 +123,10 @@ class CustomSchedule(tf.keras.optimizers.schedules.LearningRateSchedule):
 
     return tf.math.rsqrt(self.d_model) * tf.math.minimum(arg1, arg2)
 
+global_amount = tf.Variable(1) # Default value only. Will be changed.
+
 
 with strategy.scope():
-  non_paded_num = tf.Variable(1) # Default value only. Will be changed.
   learning_rate = CustomSchedule(d_model)
   optimizer = tf.keras.optimizers.Adam(learning_rate, beta_1=0.9, beta_2=0.98,
                                       epsilon=1e-9)
@@ -133,38 +134,46 @@ with strategy.scope():
   loss_object = tf.keras.losses.SparseCategoricalCrossentropy(
       from_logits=True, reduction=tf.keras.losses.Reduction.NONE)
 
-  def loss_function(real, pred):
-    global non_padded_num
+def loss_function(real, pred):
+  global global_amount
 
-    mask = tf.math.logical_not(tf.math.equal(real, 0))
-    loss_ = loss_object(real, pred)
+  replica_context = tf.distribute.get_replica_context()
+  assert replica_context is not None
 
-    mask = tf.cast(mask, dtype=loss_.dtype)
-    loss_ *= mask
+  mask = tf.math.logical_not(tf.math.equal(real, 0))
+  loss_ = loss_object(real, pred)
 
-    non_padded_num = tf.Variable(tf.reduce_sum(mask))
+  mask = tf.cast(mask, dtype=loss_.dtype)
+  loss_ *= mask
 
-    ## Must cumulate all the values across replicas and divide the loss. ##
-    non_padded_num = strategy.reduce(tf.distribute.ReduceOp.SUM, non_padded_num, axis=None)
+  non_padded_num = tf.Variable(tf.reduce_sum(mask))
 
-    return tf.reduce_sum(loss_)/tf.convert_to_tensor(non_padded_num)
+  ## Must cumulate all the values across replicas and divide the loss. ##
+  temp_store = replica_context.all_reduce(tf.distribute.ReduceOp.SUM, non_padded_num)
 
-  def accuracy_function(real, pred):
-    global non_padded_num
+  global_amount = temp_store
 
-    accuracies = tf.equal(real, tf.argmax(pred, axis=2))
+  return tf.reduce_sum(loss_)/tf.convert_to_tensor(non_padded_num)
 
-    mask = tf.math.logical_not(tf.math.equal(real, 0))
-    accuracies = tf.math.logical_and(mask, accuracies)
+def accuracy_function(real, pred):
+  global global_amount
 
-    accuracies = tf.cast(accuracies, dtype=tf.float32)
-    mask = tf.cast(mask, dtype=tf.float32)
+  replica_context = tf.distribute.get_replica_context()
+  assert replica_context is not None
 
-    accuracies = tf.Variable(tf.reduce_sum(accuracies))
+  accuracies = tf.equal(real, tf.argmax(pred, axis=2))
 
-    accuracies = strategy.reduce(tf.distribute.ReduceOp.SUM, accuracies, axis=None)
+  mask = tf.math.logical_not(tf.math.equal(real, 0))
+  accuracies = tf.math.logical_and(mask, accuracies)
 
-    return tf.convert_to_tensor(accuracies)/tf.convert_to_tensor(non_padded_num)
+  accuracies = tf.cast(accuracies, dtype=tf.float32)
+  mask = tf.cast(mask, dtype=tf.float32)
+
+  accuracies = tf.Variable(tf.reduce_sum(accuracies))
+
+  accuracies = replica_context.all_reduce(tf.distribute.ReduceOp.SUM, accuracies)
+
+  return tf.convert_to_tensor(accuracies)/tf.convert_to_tensor(global_amount)
 
 ## Lets bring these out of the scope and update them independtly of distributed training.
 train_loss = tf.keras.metrics.Mean(name='train_loss')
@@ -207,14 +216,17 @@ def aggregrate_metrics(per_replica_loss, average_accuracy):
 
   ## This occurs because the loss computed was per_replica_loss / global_batch_size.
   ## We then sum accross all replicas to get sum (per_replica_loss) / global_batch_size.
+
+  ## We get the replica context first. ##
+  replica_context = tf.distribute.get_replica_context()
+  assert replica_context is not None
   ## This is the true average_loss computed.
-  average_loss = strategy.reduce(tf.distribute.ReduceOp.SUM, per_replica_loss, axis=None)
+  average_loss = replica_context.all_reduce(tf.distribute.ReduceOp.SUM, per_replica_loss)
 
   ## Then, we just update the metrics as desired.
   train_loss(average_loss)
   train_accuracy(average_accuracy)
 
-@tf.function
 def dist_train_step(inputs, labels):
   (inp, tar_inp) = inputs
   tar_real = labels
@@ -230,10 +242,13 @@ def dist_train_step(inputs, labels):
   ## I need another function here that will aggregrate everything that I want. ##
   aggregrate_metrics(loss, accuracy_function(tar_real, predictions))
 
+
 EPOCHS = 30
 
 train_start = time.time()
 with strategy.scope():
+
+
   def train_func():
     for epoch in range(EPOCHS):
       start = time.time()
