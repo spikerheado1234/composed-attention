@@ -82,9 +82,9 @@ val_batches = make_batches(val_examples)
 
 ## Hyperparameters ##
 num_layers = args.layers
-d_model = 1024
-dff = 3074
-num_attention_heads = 16
+d_model = 512
+dff = 1024
+num_attention_heads = 8
 dropout_rate = 0.1
 
 transformer = Transformer(
@@ -131,6 +131,7 @@ def loss_function(real, pred):
   return tf.reduce_sum(loss_)/tf.reduce_sum(mask)
 
 
+# This is a NEXT TOKEN PREDICTION accuracy metric.
 def accuracy_function(real, pred):
   accuracies = tf.equal(real, tf.argmax(pred, axis=2))
 
@@ -180,6 +181,7 @@ def train_step(inputs, labels):
   (inp, tar_inp) = inputs
   tar_real = labels
 
+  print('printing in train_step:')
   inp = pad_vector(inp)
   tar_inp = pad_vector(tar_inp)
   tar_real = pad_vector(tar_real)

@@ -7,6 +7,9 @@ import argparse
 from stats import Stats 
 import os
 
+## This is a training script that has the ability to run distributed models.
+## The input batch_size should be the TOTAL batch size over here (across all replicas).
+
 ## Define argument parsing and help over here. ##
 
 parser = argparse.ArgumentParser(description='Train compositions of efficient Transformer Variants.')
@@ -80,15 +83,17 @@ def make_batches(ds):
 
 
 ## We make the batches here. ##
-train_batches = make_batches(train_examples)
-val_batches = make_batches(val_examples)
+train_batches = strategy.experimental_distribute_dataset(make_batches(train_examples))
+val_batches = strategy.experimental_distribute_dataset(make_batches(val_examples))
 
 ## Hyperparameters ##
 num_layers = args.layers
 #d_model = 1024
 d_model = 512
+#dff = 3072
 dff = 512
 num_attention_heads = 8
+#num_attention_heads = 16
 dropout_rate = 0.1
 
 with strategy.scope():
@@ -119,34 +124,49 @@ class CustomSchedule(tf.keras.optimizers.schedules.LearningRateSchedule):
     return tf.math.rsqrt(self.d_model) * tf.math.minimum(arg1, arg2)
 
 
+non_padded_num = None
 with strategy.scope():
   learning_rate = CustomSchedule(d_model)
   optimizer = tf.keras.optimizers.Adam(learning_rate, beta_1=0.9, beta_2=0.98,
                                       epsilon=1e-9)
 
-loss_object = tf.keras.losses.SparseCategoricalCrossentropy(
-    from_logits=True, reduction='none')
+  loss_object = tf.keras.losses.SparseCategoricalCrossentropy(
+      from_logits=True, reduction=tf.keras.losses.Reduction.NONE)
 
-def loss_function(real, pred):
-  mask = tf.math.logical_not(tf.math.equal(real, 0))
-  loss_ = loss_object(real, pred)
+  def loss_function(real, pred):
+    global non_padded_num
 
-  mask = tf.cast(mask, dtype=loss_.dtype)
-  loss_ *= mask
+    mask = tf.math.logical_not(tf.math.equal(real, 0))
+    loss_ = loss_object(real, pred)
 
-  return tf.reduce_sum(loss_)/tf.reduce_sum(mask)
+    mask = tf.cast(mask, dtype=loss_.dtype)
+    loss_ *= mask
 
+    non_padded_num = tf.Variable(tf.reduce_sum(mask))
 
-def accuracy_function(real, pred):
-  accuracies = tf.equal(real, tf.argmax(pred, axis=2))
+    ## Must cumulate all the values across replicas and divide the loss. ##
+    non_padded_num = strategy.reduce(tf.distribute.ReduceOp.SUM, non_padded_num, axis=None)
 
-  mask = tf.math.logical_not(tf.math.equal(real, 0))
-  accuracies = tf.math.logical_and(mask, accuracies)
+    return tf.reduce_sum(loss_)/tf.convert_to_tensor(non_padded_num)
 
-  accuracies = tf.cast(accuracies, dtype=tf.float32)
-  mask = tf.cast(mask, dtype=tf.float32)
-  return tf.reduce_sum(accuracies)/tf.reduce_sum(mask)
+  def accuracy_function(real, pred):
+    global non_padded_num
 
+    accuracies = tf.equal(real, tf.argmax(pred, axis=2))
+
+    mask = tf.math.logical_not(tf.math.equal(real, 0))
+    accuracies = tf.math.logical_and(mask, accuracies)
+
+    accuracies = tf.cast(accuracies, dtype=tf.float32)
+    mask = tf.cast(mask, dtype=tf.float32)
+
+    accuracies = tf.Variable(tf.reduce_sum(accuracies))
+
+    accuracies = strategy.reduce(tf.distribute.ReduceOp.SUM, accuracies, axis=None)
+
+    return tf.convert_to_tensor(accuracies)/tf.convert_to_tensor(non_padded_num)
+
+## Lets bring these out of the scope and update them independtly of distributed training.
 train_loss = tf.keras.metrics.Mean(name='train_loss')
 train_accuracy = tf.keras.metrics.Mean(name='train_accuracy')
 
@@ -182,17 +202,22 @@ def pad_vector(inputs):
   result = tf.concat([inputs, zero_vector], axis=1)
   return result
 
-def train_step(inputs, labels, is_dist=True):
+def aggregrate_metrics(per_replica_loss, average_accuracy):
+  ## Need to first adjust the per_replica_loss by summing ##
+
+  ## This occurs because the loss computed was per_replica_loss / global_batch_size.
+  ## We then sum accross all replicas to get sum (per_replica_loss) / global_batch_size.
+  ## This is the true average_loss computed.
+  average_loss = strategy.reduce(tf.distribute.ReduceOp.SUM, per_replica_loss, axis=None)
+
+  ## Then, we just update the metrics as desired.
+  train_loss(average_loss)
+  train_accuracy(average_accuracy)
+
+
+def train_step(inputs, labels):
   (inp, tar_inp) = inputs
   tar_real = labels
-
-  inp = pad_vector(inp)
-  tar_inp = pad_vector(tar_inp)
-  tar_real = pad_vector(tar_real)
-  if is_dist:
-    inp = strategy.experimental_distribute_dataset(inp)
-    tar_inp = strategy.experimental_distribute_dataset(tar_inp)
-    tar_real = strategy.experimental_distribute_dataset(tar_real)
 
   with tf.GradientTape() as tape:
     predictions, _ = transformer([inp, tar_inp],
@@ -202,16 +227,13 @@ def train_step(inputs, labels, is_dist=True):
   gradients = tape.gradient(loss, transformer.trainable_variables)
   optimizer.apply_gradients(zip(gradients, transformer.trainable_variables))
 
-  if not is_dist: # Otherwise we will show the accuracy and loss somewhere else.
-    train_loss(loss)
-    train_accuracy(accuracy_function(tar_real, predictions))
-
-  return loss
+  ## I need another function here that will aggregrate everything that I want. ##
+  aggregrate_metrics(loss, accuracy_function(tar_real, predictions))
 
 EPOCHS = 30
 
 train_start = time.time()
-def train_func(is_dist=False):
+def train_func():
   for epoch in range(EPOCHS):
     start = time.time()
 
@@ -220,7 +242,7 @@ def train_func(is_dist=False):
 
     # inp -> portuguese, tar -> english
     for (batch, (inp, tar)) in enumerate(train_batches):
-      train_step(inp, tar, is_dist)
+      strategy.run(train_step, args=(inp, tar))
 
       print(f'Epoch {epoch + 1} Batch {batch} Loss {train_loss.result():.4f} Accuracy {train_accuracy.result():.4f}', flush=True)
 
@@ -239,7 +261,6 @@ def train_func(is_dist=False):
 
     print(f'Time taken for 1 epoch: {time.time() - start:.2f} secs\n', flush=True)
 
-is_dist = False
 train_func()
 
 train_end = time.time()
