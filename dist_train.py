@@ -233,35 +233,36 @@ def dist_train_step(inputs, labels):
 EPOCHS = 30
 
 train_start = time.time()
-def train_func():
-  for epoch in range(EPOCHS):
-    start = time.time()
+with strategy.scope():
+  def train_func():
+    for epoch in range(EPOCHS):
+      start = time.time()
 
-    train_loss.reset_states()
-    train_accuracy.reset_states()
+      train_loss.reset_states()
+      train_accuracy.reset_states()
 
-    # inp -> portuguese, tar -> english
-    for (batch, (inp, tar)) in enumerate(train_batches):
-      strategy.experimental_run_v2(dist_train_step, args=(inp, tar))
+      # inp -> portuguese, tar -> english
+      for (batch, (inp, tar)) in enumerate(train_batches):
+        strategy.run(dist_train_step, args=(inp, tar))
 
-      print(f'Epoch {epoch + 1} Batch {batch} Loss {train_loss.result():.4f} Accuracy {train_accuracy.result():.4f}', flush=True)
+        print(f'Epoch {epoch + 1} Batch {batch} Loss {train_loss.result():.4f} Accuracy {train_accuracy.result():.4f}', flush=True)
 
-      with open('./train_data.txt', 'a+') as f:
-        f.write(f'{train_loss.result():.4f} {train_accuracy.result():.4f}\n')
+        with open('./train_data.txt', 'a+') as f:
+          f.write(f'{train_loss.result():.4f} {train_accuracy.result():.4f}\n')
 
-      with open('./train_stats.txt', 'a+') as f:
-          f.write(f'MHA {Stats.mha_time:.4f} MHA-Enc {Stats.mha_enc_time:.4f} MHA-Causal {Stats.mha_causal_time:.4f} MHA-Enc-Dec {Stats.mha_enc_dec_time:.4f} FFN {Stats.ffn_time:.4f} Downsampling {Stats.downsampling_time:.4f} Kernel-Transformation {Stats.transformation_time:.4f}\n')
+        with open('./train_stats.txt', 'a+') as f:
+            f.write(f'MHA {Stats.mha_time:.4f} MHA-Enc {Stats.mha_enc_time:.4f} MHA-Causal {Stats.mha_causal_time:.4f} MHA-Enc-Dec {Stats.mha_enc_dec_time:.4f} FFN {Stats.ffn_time:.4f} Downsampling {Stats.downsampling_time:.4f} Kernel-Transformation {Stats.transformation_time:.4f}\n')
 
-    if (epoch + 1) % 5 == 0:
-      ckpt_save_path = ckpt_manager.save()
-      print(f'Saving checkpoint for epoch {epoch+1} at {ckpt_save_path}', flush=True)
+      if (epoch + 1) % 5 == 0:
+        ckpt_save_path = ckpt_manager.save()
+        print(f'Saving checkpoint for epoch {epoch+1} at {ckpt_save_path}', flush=True)
 
 
-    print(f'Epoch {epoch + 1} Loss {train_loss.result():.4f} Accuracy {train_accuracy.result():.4f}', flush=True)
+      print(f'Epoch {epoch + 1} Loss {train_loss.result():.4f} Accuracy {train_accuracy.result():.4f}', flush=True)
 
-    print(f'Time taken for 1 epoch: {time.time() - start:.2f} secs\n', flush=True)
+      print(f'Time taken for 1 epoch: {time.time() - start:.2f} secs\n', flush=True)
 
-train_func()
+  train_func()
 
 train_end = time.time()
 
