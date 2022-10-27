@@ -214,8 +214,8 @@ def aggregrate_metrics(per_replica_loss, average_accuracy):
   train_loss(average_loss)
   train_accuracy(average_accuracy)
 
-
-def train_step(inputs, labels):
+@tf.function
+def dist_train_step(inputs, labels):
   (inp, tar_inp) = inputs
   tar_real = labels
 
@@ -242,7 +242,7 @@ def train_func():
 
     # inp -> portuguese, tar -> english
     for (batch, (inp, tar)) in enumerate(train_batches):
-      strategy.run(train_step, args=(inp, tar))
+      strategy.experimental_run_v2(dist_train_step, args=(inp, tar))
 
       print(f'Epoch {epoch + 1} Batch {batch} Loss {train_loss.result():.4f} Accuracy {train_accuracy.result():.4f}', flush=True)
 
