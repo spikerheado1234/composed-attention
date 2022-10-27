@@ -4,7 +4,7 @@ import tensorflow_datasets as tfds
 import tensorflow_text
 import time
 import argparse
-from stats import Stats 
+from stats import Stats
 import os
 
 ## This is a training script that has the ability to run distributed models.
@@ -28,7 +28,7 @@ strategy = tf.distribute.MirroredStrategy()
 
 MAX_TOKENS = args.sequence_length
 
-### Data preparation 
+### Data preparation
 
 curr_dir = os.getcwd() + "/"
 
@@ -124,8 +124,8 @@ class CustomSchedule(tf.keras.optimizers.schedules.LearningRateSchedule):
     return tf.math.rsqrt(self.d_model) * tf.math.minimum(arg1, arg2)
 
 
-non_padded_num = None
 with strategy.scope():
+  non_paded_num = tf.Variable(1) # Default value only. Will be changed.
   learning_rate = CustomSchedule(d_model)
   optimizer = tf.keras.optimizers.Adam(learning_rate, beta_1=0.9, beta_2=0.98,
                                       epsilon=1e-9)
@@ -190,7 +190,7 @@ train_step_signature = [
 ]
 
 def pad_vector(inputs):
-  global MAX_TOKENS 
+  global MAX_TOKENS
   """
   Pads the vector inputs (of size (BATCH_SIZE, SEQUENCE LENGTH)) to ensure each
   sequence length is standardized to MAX_TOKENS.
