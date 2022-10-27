@@ -149,11 +149,9 @@ def loss_function(real, pred):
   non_padded_num = tf.Variable(tf.reduce_sum(mask))
 
   ## Must cumulate all the values across replicas and divide the loss. ##
-  temp_store = replica_context.all_reduce(tf.distribute.ReduceOp.SUM, non_padded_num)
+  global_amount = replica_context.all_reduce(tf.distribute.ReduceOp.SUM, non_padded_num)
 
-  global_amount = temp_store
-
-  return tf.reduce_sum(loss_)/tf.convert_to_tensor(non_padded_num)
+  return tf.reduce_sum(loss_)/tf.convert_to_tensor(global_amount)
 
 def accuracy_function(real, pred):
   global global_amount
@@ -247,7 +245,6 @@ EPOCHS = 30
 
 train_start = time.time()
 with strategy.scope():
-
 
   def train_func():
     for epoch in range(EPOCHS):
