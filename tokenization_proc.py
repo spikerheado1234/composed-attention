@@ -64,7 +64,7 @@ def write_vocab_file(filepath, vocab):
 def generate_tokenizer(vocab_path, tokenizer_params):
     return text.BertTokenizer(vocab_path, **tokenizer_params)
 
-en_tokenizer = generate_tokenizer('en_vocab.txt', bert_tokenizer_params)
+#en_tokenizer = generate_tokenizer('en_vocab.txt', bert_tokenizer_params)
 
 ## Use only if needed. ##
 def add_start_end(inp):

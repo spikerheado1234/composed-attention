@@ -2,23 +2,26 @@ import datasets
 import tensorflow as tf
 from tokenization_proc import mask, generate_vocabulary, generate_tokenizer, write_vocab_file, bert_tokenizer_params
 
-ds = datasets.load_data('c4', 'en') ## Loads the c4 dataset.
+print('loading c4 dataset')
+ds = datasets.load_dataset('c4', 'en', split='train') ## Loads the c4 dataset.
 
+print('converting to tensorflow dataset')
 ds = ds.to_tf_dataset(
-    colums=["text"],
-    label_cols=["text"],
+    columns=["text"],
     batch_size=64,
     shuffle=True
 )
 
 ## Next, we use the dataset to generate the vocabulary. ##
-en_vocab = generate_vocabulary(ds, lambda en_one, en_two: en_one)
+print('generating vocabulary')
+en_vocab = generate_vocabulary(ds, lambda en_one: en_one)
 
 write_vocab_file('en_vocab.txt', en_vocab)
 
+print('generating tokenizer')
 en_tokenizer = generate_tokenizer('en_vocab.txt', bert_tokenizer_params)
 
-def prepare_batch(inp, tar):
+def prepare_batch(inp):
     global en_tokenizer
     ## Note, inp and tar are the same. ##
     inp_tok = en_tokenizer.tokenize(inp)
