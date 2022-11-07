@@ -4,6 +4,7 @@ import tensorflow as tf
 import tensorflow_datasets as tfds
 import tensorflow_text as text
 import numpy as np
+from constants import Constants
 
 from tensorflow_text.tools.wordpiece_vocab import bert_vocab_from_dataset as bert_vocab
 
@@ -28,7 +29,7 @@ def generate_vocabulary(ds, map_fn):
 
     bert_vocab_args = dict(
         # The target vocabulary size
-        vocab_size = 8000,
+        vocab_size = Constants.wiki_token_size,
         # Reserved tokens that must be included in the vocabulary
         reserved_tokens=reserved_tokens,
         # Arguments for `text.BertTokenizer`
@@ -48,7 +49,7 @@ def generate_vocabulary(ds, map_fn):
     return en_vocab
 
 
-SEQUENCE_LENGTH = 11
+SEQUENCE_LENGTH = Constants.SEQUENCE_LENGTH
 
 def write_vocab_file(filepath, vocab):
   with open(filepath, 'w') as f:
@@ -110,7 +111,7 @@ def mask(inp):
     inp = pad(inp)
 
     ## Then we drop the last two tokens and add the start and last token.
-    inp = inp[:, :inp.shape[1] - 2]
+    inp = inp[:, :-2]
     inp = add_start_end(inp)
 
     tar_input = inp # Fed into the decoder.

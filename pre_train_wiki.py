@@ -8,6 +8,7 @@ from stats import Stats
 import os
 from pre_train_wiki_loader import get_dataset, make_batches
 from constants import Constants
+from tokenization_proc import mask
 
 ## Define argument parsing and help over here. ##
 
@@ -34,7 +35,7 @@ BUFFER_SIZE = 20000
 BATCH_SIZE = args.batch_size
 
 ## We make the batches here. ##
-train_batches = make_batches(train_ds)
+train_batches = make_batches(train_ds, BUFFER_SIZE)
 
 ## Hyperparameters ##
 num_layers = args.layers
@@ -113,27 +114,23 @@ train_step_signature = [
     tf.TensorSpec(shape=(None, None), dtype=tf.int64),
 ]
 
-def pad_vector(inputs):
+def mask_data(inp_tok):
   global MAX_TOKENS 
   """
   Pads the vector inputs (of size (BATCH_SIZE, SEQUENCE LENGTH)) to ensure each
   sequence length is standardized to MAX_TOKENS.
   """
-  max_seq_len = inputs.shape[1]
-  current_batch_size = inputs.shape[0]
-  zero_vector = tf.zeros(shape=(current_batch_size, MAX_TOKENS - max_seq_len), dtype=tf.int64)
+  inp, tar_inp, tar_real = mask(inp_tok)
+  tar_inp = tar_inp[:, :-1] # Drop the end token for the Decoder Input.
+  tar_real = tar_real[:, 1:] # Drop the start token for what we compare to.
 
-  result = tf.concat([inputs, zero_vector], axis=1)
-  return result
+  return (inp, tar_inp), tar_real
 
 def train_step(inputs, labels):
   (inp, tar_inp) = inputs
   tar_real = labels
 
-  print('printing in train_step:')
-  inp = pad_vector(inp)
-  tar_inp = pad_vector(tar_inp)
-  tar_real = pad_vector(tar_real)
+  (inp, tar_inp), tar_real = mask_data(inp)
 
   with tf.GradientTape() as tape:
     predictions, _ = transformer([inp, tar_inp],
