@@ -18,6 +18,7 @@ parser.add_argument('--downsampling_k', dest='downsampling_k', default=32, type=
 parser.add_argument('--batch_size', dest='batch_size', default=64, type=int, help='the batch size used for training & inference purposes')
 parser.add_argument('--layers', dest='layers', default=4, type=int, help='the number of layers in the transformer.')
 parser.add_argument('--sequence_length', dest='sequence_length', type=int, default=128, help='the sequence length of the input to the transformer')
+parser.add_argument('--step_count', dest='num_steps', type=int, default=500000, help='the number of steps as input to pre-training.')
 
 args = parser.parse_args()
 
@@ -143,18 +144,25 @@ def train_step(inputs, labels):
   train_loss(loss)
   train_perplexity(perplexity_function(loss))
 
-EPOCHS = 30
+EPOCHS = args.num_steps
+total_steps_required = args.num_steps
+
+steps_elapsed = 0
 
 train_start = time.time()
 for epoch in range(EPOCHS):
   start = time.time()
+  if steps_elapsed > total_steps_required:
+    break
 
   train_loss.reset_states()
   train_accuracy.reset_states()
 
-  # inp -> portuguese, tar -> english
   for (batch, (inp, tar)) in enumerate(train_batches):
+    if steps_elapsed > total_steps_required:
+      break
     train_step(inp, tar)
+    steps_elapsed += 1
 
     print(f'Epoch {epoch + 1} Batch {batch} Loss {train_loss.result():.4f} Accuracy {train_accuracy.result():.4f}', flush=True)
 
@@ -172,6 +180,7 @@ for epoch in range(EPOCHS):
   print(f'Epoch {epoch + 1} Loss {train_loss.result():.4f} Accuracy {train_accuracy.result():.4f}', flush=True)
 
   print(f'Time taken for 1 epoch: {time.time() - start:.2f} secs\n', flush=True)
+
 
 train_end = time.time()
 
