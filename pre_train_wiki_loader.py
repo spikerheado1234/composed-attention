@@ -11,15 +11,17 @@ train_dir = os.getcwd() + "/wikitext-103/wiki.train.tokens"
 ## TODO, standardize later. ##
 seed = 42
 
-ds = TextLineDataset(
-   [train_dir]
-)
+def get_dataset():
+    ds = TextLineDataset(
+            [train_dir]
+    )
+    return ds
 
 ## Next, we use the dataset to generate the vocabulary. ##
 print('generating vocabulary')
-en_vocab = generate_vocabulary(ds, lambda en_one: en_one)
+#en_vocab = generate_vocabulary(get_dataset(), lambda en_one: en_one)
 
-write_vocab_file('en_vocab.txt', en_vocab)
+#write_vocab_file('en_vocab.txt', en_vocab)
 
 print('generating tokenizer')
 en_tokenizer = generate_tokenizer('en_vocab.txt', bert_tokenizer_params)
