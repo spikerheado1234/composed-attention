@@ -36,7 +36,7 @@ BUFFER_SIZE = 20000
 BATCH_SIZE = args.batch_size
 
 ## We make the batches here. ##
-train_batches = make_batches(train_ds, BUFFER_SIZE)
+train_batches = make_batches(train_ds, BUFFER_SIZE, BATCH_SIZE)
 
 ## Hyperparameters ##
 num_layers = args.layers
@@ -50,8 +50,8 @@ transformer = Transformer(
     d_model=d_model,
     num_attention_heads=num_attention_heads,
     dff=dff,
-    input_vocab_size=Constants.wiki_token_size,
-    target_vocab_size=Constants.wiki_token_size,
+    input_vocab_size=Constants.wiki_vocab_size,
+    target_vocab_size=Constants.wiki_vocab_size,
     dropout_rate=dropout_rate,
     downsampling_value=args.downsampling_k if args.attention_type == 'LinMHA' else 32, # Just default to 32 otherwise, doesn't matter since it won't be used.
     attention_type=args.attention_type)
@@ -121,7 +121,7 @@ def mask_data(inp_tok):
   Pads the vector inputs (of size (BATCH_SIZE, SEQUENCE LENGTH)) to ensure each
   sequence length is standardized to MAX_TOKENS.
   """
-  inp, tar_inp, tar_real = mask(inp_tok)
+  inp, tar_inp, tar_real = mask(inp_tok, MAX_TOKENS)
   tar_inp = tar_inp[:, :-1] # Drop the end token for the Decoder Input.
   tar_real = tar_real[:, 1:] # Drop the start token for what we compare to.
 

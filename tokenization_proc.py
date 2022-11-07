@@ -29,7 +29,7 @@ def generate_vocabulary(ds, map_fn):
 
     bert_vocab_args = dict(
         # The target vocabulary size
-        vocab_size = Constants.wiki_token_size,
+        vocab_size = Constants.wiki_vocab_size,
         # Reserved tokens that must be included in the vocabulary
         reserved_tokens=reserved_tokens,
         # Arguments for `text.BertTokenizer`
@@ -103,11 +103,10 @@ def pad(inp):
         return inp
 
 ## Masks 15% of the input. Ragged Tensor should be tokenized via Bert-Style tokenization. ##
-def mask(inp):
-    global SEQUENCE_LENGTH
+def mask(inp, seq_length):
 
     inp = inp.merge_dims(-2, -1).to_tensor()
-    inp = inp[:, :SEQUENCE_LENGTH]
+    inp = inp[:, :seq_length]
     inp = pad(inp)
 
     ## Then we drop the last two tokens and add the start and last token.

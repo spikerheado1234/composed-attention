@@ -33,10 +33,11 @@ def prepare_batch(inp):
 
     return (inp_tok, inp_tok), inp_tok 
 
-def make_batches(ds, BUFFER_SIZE):
+def make_batches(ds, BUFFER_SIZE, BATCH_SIZE):
   return (
       ds
       .shuffle(BUFFER_SIZE)
+      .batch(BATCH_SIZE)
       .map(prepare_batch, tf.data.AUTOTUNE)
       .prefetch(buffer_size=tf.data.AUTOTUNE))
 
