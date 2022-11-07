@@ -2,15 +2,17 @@ import datasets
 import tensorflow as tf
 from tokenization_proc import mask, generate_vocabulary, generate_tokenizer, write_vocab_file, bert_tokenizer_params
 from tensorflow.data import TextLineDataset
+import os
 
 print('loading wikitext dataset')
 
-train_dir = "/Users/Ahan/Desktop/Ahan/UIUC/PL-FOR-NAS/attention/wikitext-103/"
+train_dir = os.getcwd() + "/wikitext-103/wiki.train.tokens"
 
-seed=42
+## TODO, standardize later. ##
+seed = 42
 
 ds = TextLineDataset(
-   ['/Users/Ahan/Desktop/Ahan/UIUC/PL-FOR-NAS/attention/wikitext-103/wiki_train.txt'],
+   [train_dir]
 )
 
 ## Next, we use the dataset to generate the vocabulary. ##
