@@ -157,6 +157,7 @@ for epoch in range(EPOCHS):
 
   train_loss.reset_states()
   train_accuracy.reset_states()
+  train_perplexity.reset_states()
 
   for (batch, (inp, tar)) in enumerate(train_batches):
     if steps_elapsed > total_steps_required:
