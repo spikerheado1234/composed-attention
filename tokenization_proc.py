@@ -7,7 +7,7 @@ import numpy as np
 
 from tensorflow_text.tools.wordpiece_vocab import bert_vocab_from_dataset as bert_vocab
 
-paths = [f'/Users/Ahan/Desktop/Ahan/UIUC/PL-FOR-NAS/attention/wikitext-103/wiki.{variable}.tokens' for variable in ['valid']]
+paths = [f'/Users/Ahan/Desktop/Ahan/UIUC/PL-FOR-NAS/attention/wikitext-103/wiki.{variable}.tokens' for variable in ['valid', 'test', 'train']]
 
 def generate_wiki(paths):
     data = []

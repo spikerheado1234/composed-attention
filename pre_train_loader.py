@@ -2,8 +2,8 @@ import datasets
 import tensorflow as tf
 from tokenization_proc import mask, generate_vocabulary, generate_tokenizer, write_vocab_file, bert_tokenizer_params
 
-print('loading c4 dataset')
-ds = datasets.load_dataset('c4', 'en', split='train') ## Loads the c4 dataset.
+print('loading wikitext dataset')
+ds = datasets.load_dataset('wikitext', 'wikitext-103-v1', split='train') ## Loads the c4 dataset.
 
 print('converting to tensorflow dataset')
 ds = ds.to_tf_dataset(
