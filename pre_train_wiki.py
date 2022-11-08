@@ -19,6 +19,7 @@ parser.add_argument('--batch_size', dest='batch_size', default=64, type=int, hel
 parser.add_argument('--layers', dest='layers', default=4, type=int, help='the number of layers in the transformer.')
 parser.add_argument('--sequence_length', dest='sequence_length', type=int, default=128, help='the sequence length of the input to the transformer')
 parser.add_argument('--step_count', dest='num_steps', type=int, default=500000, help='the number of steps as input to pre-training.')
+parser.add_argument('--rank', dest='rank', type=int, default=1, help='The rank of the process, to distinguish output.')
 
 args = parser.parse_args()
 
@@ -44,6 +45,7 @@ d_model = 1024
 dff = 3072
 num_attention_heads = 10
 dropout_rate = 0.1
+rank = args.rank
 
 transformer = Transformer(
     num_layers=num_layers,
@@ -184,10 +186,10 @@ for epoch in range(EPOCHS):
 
     print(f'Epoch {epoch + 1} Batch {batch} Loss {train_loss.result():.4f} Accuracy {train_accuracy.result():.4f}', flush=True)
 
-    with open('./train_data.txt', 'a+') as f:
+    with open('./train_data_' + rank + '.txt', 'a+') as f:
       f.write(f'{train_loss.result():.4f} {train_accuracy.result():.4f}\n')
 
-    with open('./train_stats.txt', 'a+') as f:
+    with open('./train_stats_' + rank + '.txt', 'a+') as f:
         f.write(f'MHA {Stats.mha_time:.4f} MHA-Enc {Stats.mha_enc_time:.4f} MHA-Causal {Stats.mha_causal_time:.4f} MHA-Enc-Dec {Stats.mha_enc_dec_time:.4f} FFN {Stats.ffn_time:.4f} Downsampling {Stats.downsampling_time:.4f} Kernel-Transformation {Stats.transformation_time:.4f}\n')
 
   if (epoch + 1) % 5 == 0:
