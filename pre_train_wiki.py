@@ -79,6 +79,20 @@ optimizer = tf.keras.optimizers.Adam(learning_rate, beta_1=0.9, beta_2=0.98,
 loss_object = tf.keras.losses.SparseCategoricalCrossentropy(
     from_logits=True, reduction='none')
 
+def accuracy_function(real, pred):
+
+  accuracies = tf.equal(real, tf.argmax(pred, axis=2))
+
+  mask = tf.math.logical_not(tf.math.equal(real, 0))
+
+  accuracies = tf.math.logical_and(mask, accuracies)
+
+  accuracies = tf.cast(accuracies, dtype=tf.float32)
+  mask = tf.cast(mask, dtype=tf.float32)
+
+  return tf.reduce_sum(accuracies) / tf.reduce_sum(mask)
+  
+
 def loss_function(real, pred):
   mask = tf.math.logical_not(tf.math.equal(real, 0))
   loss_ = loss_object(real, pred)
@@ -137,11 +151,13 @@ def train_step(inputs, labels):
     predictions, _ = transformer([inp, tar_inp],
                                  training = True)
     loss = loss_function(tar_real, predictions)
+    accuracy = accuracy_function(tar_real, predictions)
 
   gradients = tape.gradient(loss, transformer.trainable_variables)
   optimizer.apply_gradients(zip(gradients, transformer.trainable_variables))
 
   train_loss(loss)
+  train_accuracy(accuracy)
   train_perplexity(perplexity_function(loss))
 
 EPOCHS = args.num_steps
