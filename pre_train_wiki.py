@@ -57,19 +57,20 @@ transformer = Transformer(
     attention_type=args.attention_type)
 
 class CustomSchedule(tf.keras.optimizers.schedules.LearningRateSchedule):
-  def __init__(self, d_model, warmup_steps=4000):
+  def __init__(self, d_model, warmup_steps=10000):
     super().__init__()
 
     self.d_model = d_model
     self.d_model = tf.cast(self.d_model, tf.float32)
 
-    self.warmup_steps = warmup_steps
+    self.warmup_steps = tf.constant(warmup_steps)
+    self.warmup_steps = tf.cast(self.warmup_steps, tf.float32)
 
   def __call__(self, step):
-    arg1 = tf.math.rsqrt(step)
-    arg2 = step * (self.warmup_steps ** -1.5)
-
-    return tf.math.rsqrt(self.d_model) * tf.math.minimum(arg1, arg2)
+    step_one = tf.constant(step)
+    step_one = tf.cast(step_one, tf.float32)
+    max_val = tf.math.maximum(step_one, self.warmup_steps)
+    return tf.math.rsqrt(max_val)
 
 
 learning_rate = CustomSchedule(d_model)
