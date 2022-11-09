@@ -48,9 +48,6 @@ def generate_vocabulary(ds, map_fn):
     )
     return en_vocab
 
-
-SEQUENCE_LENGTH = Constants.SEQUENCE_LENGTH
-
 def write_vocab_file(filepath, vocab):
   with open(filepath, 'w') as f:
     for token in vocab:
@@ -91,13 +88,12 @@ def masker(inp):
 
     return tf.convert_to_tensor(inp)
 
-def pad(inp):
-    global SEQUENCE_LENGTH
+def pad(inp, seq_length):
     ## Now, in the event that inp is less than sequence length, we must pad with zeros accordingly. ##
     max_seq_len = inp.shape[1]
     current_batch_size = inp.shape[0]
-    if SEQUENCE_LENGTH - max_seq_len > 0:
-        zero_vector = tf.zeros(shape=(current_batch_size, SEQUENCE_LENGTH - max_seq_len), dtype=tf.int64)
+    if seq_length - max_seq_len > 0:
+        zero_vector = tf.zeros(shape=(current_batch_size, seq_length - max_seq_len), dtype=tf.int64)
         return tf.concat([inp, zero_vector], axis=1)
     else:
         return inp
@@ -107,7 +103,7 @@ def mask(inp, seq_length):
 
     inp = inp.merge_dims(-2, -1).to_tensor()
     inp = inp[:, :seq_length]
-    inp = pad(inp)
+    inp = pad(inp, seq_length)
 
     ## Then we drop the last two tokens and add the start and last token.
     inp = inp[:, :-2]
