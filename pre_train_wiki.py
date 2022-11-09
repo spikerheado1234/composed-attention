@@ -153,7 +153,6 @@ def train_step(inputs, labels):
   with tf.GradientTape() as tape:
     predictions, _ = transformer([inp, tar_inp],
                                  training = True)
-    print(transformer.summary())
     loss = loss_function(tar_real, predictions)
     accuracy = accuracy_function(tar_real, predictions)
 
@@ -183,7 +182,7 @@ for epoch in range(EPOCHS):
     if steps_elapsed > total_steps_required:
       break
     train_step(inp, tar)
-    if (steps_elapsed % 1000):
+    if (steps_elapsed % 1000 == 0):
       # We print end-to-end time here just in case.
       print(f'----------- End-to-End: {time.time() - train_start} -----------')
     steps_elapsed += 1
