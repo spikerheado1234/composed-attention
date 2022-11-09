@@ -183,6 +183,9 @@ for epoch in range(EPOCHS):
     if steps_elapsed > total_steps_required:
       break
     train_step(inp, tar)
+    if (steps_elapsed % 1000):
+      # We print end-to-end time here just in case.
+      print(f'----------- End-to-End: {time.time() - train_start} -----------')
     steps_elapsed += 1
 
     print(f'Epoch {epoch + 1} Batch {batch} Loss {train_loss.result():.4f} Accuracy {train_accuracy.result():.4f}', flush=True)
