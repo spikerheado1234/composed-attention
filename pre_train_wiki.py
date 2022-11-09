@@ -41,9 +41,9 @@ train_batches = make_batches(train_ds, BUFFER_SIZE, BATCH_SIZE)
 
 ## Hyperparameters ##
 num_layers = args.layers
-d_model = 768
+d_model = 512
 dff = 3072
-num_attention_heads = 12
+num_attention_heads = 8
 dropout_rate = 0.1
 rank = args.rank
 
@@ -153,6 +153,7 @@ def train_step(inputs, labels):
   with tf.GradientTape() as tape:
     predictions, _ = transformer([inp, tar_inp],
                                  training = True)
+    print(transformer.summary())
     loss = loss_function(tar_real, predictions)
     accuracy = accuracy_function(tar_real, predictions)
 
