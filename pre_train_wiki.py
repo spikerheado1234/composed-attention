@@ -113,9 +113,10 @@ train_loss = tf.keras.metrics.Mean(name='train_loss')
 train_accuracy = tf.keras.metrics.Mean(name='train_accuracy')
 train_perplexity = tf.keras.metrics.Mean(name='train_perplexity')
 
-checkpoint_path = './checkpoints/train'
+checkpoint_path = './checkpoints/train/' + str(rank)
 
-ckpt = tf.train.Checkpoint(transformer=transformer,
+ckpt = tf.train.Checkpoint(step=tf.Variable(1),
+                           transformer=transformer,
                            optimizer=optimizer)
 
 ckpt_manager = tf.train.CheckpointManager(ckpt, checkpoint_path, max_to_keep=5)
@@ -153,6 +154,7 @@ def train_step(inputs, labels):
   with tf.GradientTape() as tape:
     predictions, _ = transformer([inp, tar_inp],
                                  training = True)
+    print(transformer.summary())
     loss = loss_function(tar_real, predictions)
     accuracy = accuracy_function(tar_real, predictions)
 
@@ -185,6 +187,10 @@ for epoch in range(EPOCHS):
     if (steps_elapsed % 1000 == 0):
       # We print end-to-end time here just in case.
       print(f'----------- End-to-End: {time.time() - train_start} -----------')
+    if (steps_elapsed % 5000 == 0):
+      save_path = ckpt_manager.save()
+      print(f'Saved checkpoint for step: {steps_elapsed} path: {save_path}')
+      ckpt.step.assign_add(1)
     steps_elapsed += 1
 
     print(f'Epoch {epoch + 1} Batch {batch} Loss {train_loss.result():.4f} Accuracy {train_accuracy.result():.4f}', flush=True)
