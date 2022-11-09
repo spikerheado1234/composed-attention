@@ -41,9 +41,9 @@ train_batches = make_batches(train_ds, BUFFER_SIZE, BATCH_SIZE)
 
 ## Hyperparameters ##
 num_layers = args.layers
-d_model = 1024
+d_model = 768
 dff = 3072
-num_attention_heads = 10
+num_attention_heads = 12
 dropout_rate = 0.1
 rank = args.rank
 
@@ -186,10 +186,10 @@ for epoch in range(EPOCHS):
 
     print(f'Epoch {epoch + 1} Batch {batch} Loss {train_loss.result():.4f} Accuracy {train_accuracy.result():.4f}', flush=True)
 
-    with open('./train_data_' + rank + '.txt', 'a+') as f:
+    with open(f'./train_data_{rank}.txt', 'a+') as f:
       f.write(f'{train_loss.result():.4f} {train_accuracy.result():.4f}\n')
 
-    with open('./train_stats_' + rank + '.txt', 'a+') as f:
+    with open(f'./train_stats_{rank}.txt', 'a+') as f:
         f.write(f'MHA {Stats.mha_time:.4f} MHA-Enc {Stats.mha_enc_time:.4f} MHA-Causal {Stats.mha_causal_time:.4f} MHA-Enc-Dec {Stats.mha_enc_dec_time:.4f} FFN {Stats.ffn_time:.4f} Downsampling {Stats.downsampling_time:.4f} Kernel-Transformation {Stats.transformation_time:.4f}\n')
 
   if (epoch + 1) % 5 == 0:
