@@ -152,7 +152,6 @@ def train_step(inputs, labels):
   with tf.GradientTape() as tape:
     predictions, _ = transformer([inp, tar_inp],
                                  training = True)
-    print(transformer.summary())
     loss = loss_function(tar_real, predictions)
     accuracy = accuracy_function(tar_real, predictions)
 
@@ -189,15 +188,16 @@ for epoch in range(EPOCHS):
       save_path = ckpt_manager.save()
       print(f'Saved checkpoint for step: {steps_elapsed} path: {save_path}')
       ckpt.step.assign_add(1)
-    steps_elapsed += 1
 
-    print(f'Epoch {epoch + 1} Batch {batch} Loss {train_loss.result():.4f} Accuracy {train_accuracy.result():.4f}', flush=True)
+    print(f'Steps {steps_elapsed} Epoch {epoch + 1} Batch {batch} Loss {train_loss.result():.4f} Accuracy {train_accuracy.result():.4f}', flush=True)
 
     with open(f'./train_data_{rank}.txt', 'a+') as f:
-      f.write(f'{train_loss.result():.4f} {train_accuracy.result():.4f}\n')
+      f.write(f'{steps_elapsed} {train_loss.result():.4f} {train_accuracy.result():.4f}\n')
 
     with open(f'./train_stats_{rank}.txt', 'a+') as f:
-        f.write(f'MHA {Stats.mha_time:.4f} MHA-Enc {Stats.mha_enc_time:.4f} MHA-Causal {Stats.mha_causal_time:.4f} MHA-Enc-Dec {Stats.mha_enc_dec_time:.4f} FFN {Stats.ffn_time:.4f} Downsampling {Stats.downsampling_time:.4f} Kernel-Transformation {Stats.transformation_time:.4f}\n')
+        f.write(f'{steps_elapsed} MHA {Stats.mha_time:.4f} MHA-Enc {Stats.mha_enc_time:.4f} MHA-Causal {Stats.mha_causal_time:.4f} MHA-Enc-Dec {Stats.mha_enc_dec_time:.4f} FFN {Stats.ffn_time:.4f} Downsampling {Stats.downsampling_time:.4f} Kernel-Transformation {Stats.transformation_time:.4f}\n')
+
+    steps_elapsed += 1
 
   if (epoch + 1) % 5 == 0:
     ckpt_save_path = ckpt_manager.save()
