@@ -39,7 +39,7 @@ def plot_new_loss(*args):
         with open(dir, "r") as f:
             for i, line in enumerate(f):
                 split_tokens = line.split()
-                if split_tokens[0] == "Saved" or split_tokens[0] == "-----------":
+                if (len(split_tokens) > 0 and split_tokens[0] != "Steps") or (len(split_tokens) == 0):
                     continue
                 loss.append(float(split_tokens[7]))
 
@@ -64,7 +64,7 @@ def plot_new_accuracy(*args):
         with open(dir, "r") as f:
             for i, line in enumerate(f):
                 split_tokens = line.split()
-                if split_tokens[0] == "Saved" or split_tokens[0] == "-----------":
+                if (len(split_tokens) > 0 and split_tokens[0] != "Steps") or (len(split_tokens) == 0):
                     continue
                 curr_accuracy = float(split_tokens[9])
                 accuracy.append(curr_accuracy)
@@ -119,10 +119,8 @@ def plot_accuracy(*args):
 #              ('/Users/Ahan/Desktop/Ahan/UIUC/PL-FOR-NAS/attention/data/pt_train_data.txt', 'PerFormer'),
 #              ('/Users/Ahan/Desktop/Ahan/UIUC/PL-FOR-NAS/attention/data/ltCpt_train_data.txt', 'Lin-Perf Composed'),
 #              ('/Users/Ahan/Desktop/Ahan/UIUC/PL-FOR-NAS/attention/data/vt_train_data.txt', 'Vanilla Transformer'))
-#plot_new_loss(('/Users/Ahan/Desktop/Ahan/UIUC/PL-FOR-NAS/output_one.in', 'Vanilla Transformer'),
-#              ('/Users/Ahan/Desktop/Ahan/UIUC/PL-FOR-NAS/output_two.in', 'Composed Variant'))
-plot_new_accuracy(('/Users/Ahan/Desktop/Ahan/UIUC/PL-FOR-NAS/output_one.in', 'Vanilla Transformer'),
-              ('/Users/Ahan/Desktop/Ahan/UIUC/PL-FOR-NAS/output_two.in', 'Composed Variant'))
+#plot_new_loss(('/Users/Ahan/Desktop/Ahan/UIUC/PL-FOR-NAS/output_one.in', 'Vanilla Transformer'))
+plot_new_accuracy(('/Users/Ahan/Desktop/Ahan/UIUC/PL-FOR-NAS/output_one.in', 'Vanilla Transformer'))
 plt.show()
 
 
