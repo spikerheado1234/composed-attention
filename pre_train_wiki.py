@@ -155,7 +155,7 @@ distribution = [0, 0, 0, 0] # 0, 0 < 10, 10 -50, > 50
 def compute_distribution(inp):
   global distribution
 
-  count = tf.reduce_sum(tf.cast(tf.equal(inp, 0), dtype=tf.int64))
+  count = tf.reduce_sum(tf.cast(tf.math.logical_not(tf.equal(inp, 0)), dtype=tf.int64))
 
   if count == 0:
     distribution[0] += 1
