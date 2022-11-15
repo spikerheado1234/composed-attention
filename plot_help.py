@@ -1,4 +1,5 @@
 import matplotlib.pyplot as plt
+import tensorflow as tf
 
 
 granularity = 500 
@@ -41,16 +42,16 @@ def plot_new_loss(*args):
                 split_tokens = line.split()
                 if (len(split_tokens) > 0 and split_tokens[0] != "Steps") or (len(split_tokens) == 0):
                     continue
-                loss.append(float(split_tokens[7]))
+                loss.append(tf.math.exp(float(split_tokens[7])))
 
         plt.plot(loss, line_types[line_type])
         line_type += 1
         headings.append(heading)
 
     plt.legend(headings, loc='upper left')
-    plt.title('Loss Curves')
+    plt.title('Perplexity Curves')
     plt.xlabel(f'step count')
-    plt.ylabel('loss')
+    plt.ylabel('perplexity')
 
 def plot_new_accuracy(*args):
     global line_types
@@ -119,8 +120,8 @@ def plot_accuracy(*args):
 #              ('/Users/Ahan/Desktop/Ahan/UIUC/PL-FOR-NAS/attention/data/pt_train_data.txt', 'PerFormer'),
 #              ('/Users/Ahan/Desktop/Ahan/UIUC/PL-FOR-NAS/attention/data/ltCpt_train_data.txt', 'Lin-Perf Composed'),
 #              ('/Users/Ahan/Desktop/Ahan/UIUC/PL-FOR-NAS/attention/data/vt_train_data.txt', 'Vanilla Transformer'))
-#plot_new_loss(('/Users/Ahan/Desktop/Ahan/UIUC/PL-FOR-NAS/output_one.in', 'Vanilla Transformer'))
-plot_new_accuracy(('/Users/Ahan/Desktop/Ahan/UIUC/PL-FOR-NAS/output_one.in', 'Vanilla Transformer'))
+plot_new_loss(('/Users/Ahan/Desktop/Ahan/UIUC/PL-FOR-NAS/output_one.in', 'Vanilla Transformer'))
+#plot_new_accuracy(('/Users/Ahan/Desktop/Ahan/UIUC/PL-FOR-NAS/output_one.in', 'Vanilla Transformer'))
 plt.show()
 
 

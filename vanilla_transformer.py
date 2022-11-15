@@ -30,11 +30,11 @@ def positional_encoding(length, depth):
   return tf.cast(pos_encoding, dtype=tf.float32)
 
 class PositionalEmbedding(tf.keras.layers.Layer):
-  def __init__(self, vocab_size, d_model):
+  def __init__(self, vocab_size, d_model, length):
     super().__init__()
     self.d_model = d_model
     self.embedding = tf.keras.layers.Embedding(vocab_size, d_model, mask_zero=True) 
-    self.pos_encoding = positional_encoding(length=2048, depth=d_model)
+    self.pos_encoding = positional_encoding(length=length, depth=d_model)
 
   def compute_mask(self, *args, **kwargs):
     return self.embedding.compute_mask(*args, **kwargs)
@@ -150,6 +150,7 @@ class Encoder(tf.keras.layers.Layer):
                num_attention_heads,
                dff, # Inner-layer dimensionality.
                input_vocab_size, # Input (Portuguese) vocabulary size.
+               sequence_length,
                dropout_rate=0.1,
                downsampling_value=32,
                attention_type='MHA'
@@ -160,7 +161,7 @@ class Encoder(tf.keras.layers.Layer):
     self.num_layers = num_layers
 
     # Embeddings + Positional encoding
-    self.pos_embedding = PositionalEmbedding(input_vocab_size, d_model)
+    self.pos_embedding = PositionalEmbedding(input_vocab_size, d_model, length=sequence_length)
 
     # Encoder layers.
     self.enc_layers = [
@@ -354,6 +355,7 @@ class Decoder(tf.keras.layers.Layer):
                num_attention_heads,
                dff, # Inner-layer dimensionality.
                target_vocab_size,
+               sequence_length,
                dropout_rate=0.1,
                downsampling_value=32,
                attention_type='MHA'
@@ -363,7 +365,7 @@ class Decoder(tf.keras.layers.Layer):
     self.d_model = d_model
     self.num_layers = num_layers
 
-    self.pos_embedding = PositionalEmbedding(target_vocab_size, d_model)
+    self.pos_embedding = PositionalEmbedding(target_vocab_size, d_model, length=sequence_length)
 
     self.dec_layers = [
         DecoderLayer(
@@ -404,6 +406,7 @@ class Transformer(tf.keras.Model):
                dff, # Inner-layer dimensionality.
                input_vocab_size, # Input (Portuguese) vocabulary size.
                target_vocab_size, # Target (English) vocabulary size.
+               sequence_length,
                dropout_rate=0.1,
                downsampling_value=32, # Default downsampling k value, as expressed in LinFormer, to 32.
                attention_type='MHA' # One of either: MHA, LinMHA or PerfMHA.
@@ -418,7 +421,8 @@ class Transformer(tf.keras.Model):
       input_vocab_size=input_vocab_size,
       dropout_rate=dropout_rate,
       downsampling_value=downsampling_value,
-      attention_type=attention_type
+      attention_type=attention_type,
+      sequence_length=sequence_length
       )
 
     # The decoder.
@@ -430,7 +434,8 @@ class Transformer(tf.keras.Model):
       target_vocab_size=target_vocab_size,
       dropout_rate=dropout_rate,
       downsampling_value=downsampling_value,
-      attention_type=attention_type
+      attention_type=attention_type,
+      sequence_length=sequence_length
       )
 
     # The final linear layer.
