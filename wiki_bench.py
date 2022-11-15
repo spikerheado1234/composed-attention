@@ -56,7 +56,8 @@ transformer = Transformer(
     target_vocab_size=Constants.wiki_vocab_size,
     dropout_rate=dropout_rate,
     downsampling_value=args.downsampling_k if args.attention_type == 'LinMHA' else 32, # Just default to 32 otherwise, doesn't matter since it won't be used.
-    attention_type=args.attention_type)
+    attention_type=args.attention_type,
+    sequence_length=args.sequence_length)
 
 class CustomSchedule(tf.keras.optimizers.schedules.LearningRateSchedule):
   def __init__(self, d_model, warmup_steps=4000):
