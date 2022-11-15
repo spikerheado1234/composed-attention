@@ -150,11 +150,30 @@ def mask_data(inp_tok):
   weight = weight[:, 1:]
   return (inp, tar_inp), tar_real, tf.convert_to_tensor(weight, dtype=tf.int64)
 
+distribution = [0, 0, 0, 0] # 0, 0 < 10, 10 -50, > 50
+
+def compute_distribution(inp):
+  global distribution
+
+  count = tf.reduce_sum(tf.cast(tf.equal(inp, 0), dtype=tf.int64))
+
+  if count == 0:
+    distribution[0] += 1
+  elif 0 < count < 10:
+    distribution[1] += 1
+  elif 10 <= count < 50:
+    distribution[2] += 1
+  else:
+    distribution[3] += 1
+
 def train_step(inputs, labels):
+
   (inp, tar_inp) = inputs
   tar_real = labels
 
   (inp, tar_inp), tar_real, weight = mask_data(inp)
+
+  compute_distribution(inp)
 
   with tf.GradientTape() as tape:
     predictions, _ = transformer([inp, tar_inp],
@@ -195,6 +214,10 @@ for epoch in range(EPOCHS):
       save_path = ckpt_manager.save()
       print(f'Saved checkpoint for step: {steps_elapsed} path: {save_path}')
       ckpt.step.assign_add(1)
+
+    if (steps_elapsed % 300 == 0):
+      with open(f'junk_test_{rank}.txt', 'a+') as f:
+        f.write(f'junk distribution {distribution}\n')
 
     print(f'Steps {steps_elapsed} Epoch {epoch + 1} Batch {batch} Loss {train_loss.result():.4f} Accuracy {train_accuracy.result():.4f}', flush=True)
 
