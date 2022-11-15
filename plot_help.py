@@ -105,6 +105,29 @@ def plot_accuracy(*args):
     plt.xlabel(f'step count (per {granularity})')
     plt.ylabel('Accuracy')
 
+def plot_performance(*args):
+    headings = []
+    line_type = 0
+
+    for dir, heading in args:
+        run_time = []
+        seq_length = []
+        with open(dir, "r") as f:
+            for line in f:
+                line_split = line.split()
+                run_time.append(float(line_split[3][:-1])/100)
+                seq_length.append(float(line_split[6]))
+
+        plt.plot(seq_length, run_time, line_types[line_type])
+        line_type += 1
+        headings.append(heading)
+
+    plt.legend(headings, loc='upper left')
+    plt.title('Run-Time')
+    plt.xlabel(f'Sequence Length')
+    plt.ylabel('Time (s)')
+
+
 
 #plot_loss(('/Users/Ahan/Desktop/Ahan/UIUC/PL-FOR-NAS/attention/data/vt_512s_8bs_train_data.txt', 'Vanilla Transformer'),
 #           ('/Users/Ahan/Desktop/Ahan/UIUC/PL-FOR-NAS/attention/data/pt_512s_8bs_train_data.txt', 'Performer-VT Semi-Composed'))
@@ -120,8 +143,11 @@ def plot_accuracy(*args):
 #              ('/Users/Ahan/Desktop/Ahan/UIUC/PL-FOR-NAS/attention/data/pt_train_data.txt', 'PerFormer'),
 #              ('/Users/Ahan/Desktop/Ahan/UIUC/PL-FOR-NAS/attention/data/ltCpt_train_data.txt', 'Lin-Perf Composed'),
 #              ('/Users/Ahan/Desktop/Ahan/UIUC/PL-FOR-NAS/attention/data/vt_train_data.txt', 'Vanilla Transformer'))
-plot_new_loss(('/Users/Ahan/Desktop/Ahan/UIUC/PL-FOR-NAS/output_one.in', 'Vanilla Transformer'))
+#plot_new_loss(('/Users/Ahan/Desktop/Ahan/UIUC/PL-FOR-NAS/output_one.in', 'Vanilla Transformer'))
 #plot_new_accuracy(('/Users/Ahan/Desktop/Ahan/UIUC/PL-FOR-NAS/output_one.in', 'Vanilla Transformer'))
+plot_performance(('/Users/Ahan/Desktop/Ahan/UIUC/PL-FOR-NAS/benchmark_results_MHA.txt', 'Vanilla Transformer'),
+                 ('/Users/Ahan/Desktop/Ahan/UIUC/PL-FOR-NAS/benchmark_results_CompMHA.txt', 'Lin-Perf Transformer'),
+                 ('/Users/Ahan/Desktop/Ahan/UIUC/PL-FOR-NAS/benchmark_results_LinMHA.txt', 'Linformer'))
 plt.show()
 
 

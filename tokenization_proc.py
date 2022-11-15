@@ -85,6 +85,9 @@ def masker(inp):
     inp = inp.numpy()
     MASK = tf.argmax(tf.constant(reserved_tokens) == "[MASK]")
     inp[mask] = MASK
+    ## Put back into the input the start and end tokens if masked out initially.
+    inp[:, 0] = tf.argmax(tf.constant(reserved_tokens) == "[START]")
+    inp[:, -1] = tf.argmax(tf.constant(reserved_tokens) == "[END]")
 
     return tf.convert_to_tensor(inp)
 

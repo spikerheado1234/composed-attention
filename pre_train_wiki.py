@@ -9,6 +9,7 @@ import os
 from pre_train_wiki_loader import get_dataset, make_batches
 from constants import Constants
 from tokenization_proc import mask
+import numpy as np
 
 ## Define argument parsing and help over here. ##
 
@@ -56,7 +57,8 @@ transformer = Transformer(
     target_vocab_size=Constants.wiki_vocab_size,
     dropout_rate=dropout_rate,
     downsampling_value=args.downsampling_k if args.attention_type == 'LinMHA' else 32, # Just default to 32 otherwise, doesn't matter since it won't be used.
-    attention_type=args.attention_type)
+    attention_type=args.attention_type,
+    sequence_length=args.sequence_length)
 
 class CustomSchedule(tf.keras.optimizers.schedules.LearningRateSchedule):
   def __init__(self, d_model, warmup_steps=4000):
@@ -94,9 +96,9 @@ def accuracy_function(real, pred):
   return tf.reduce_sum(accuracies) / tf.reduce_sum(mask)
   
 
-def loss_function(real, pred):
+def loss_function(real, pred, sample_weight):
   mask = tf.math.logical_not(tf.math.equal(real, 0))
-  loss_ = loss_object(real, pred)
+  loss_ = loss_object(real, pred, sample_weight=sample_weight)
 
   mask = tf.cast(mask, dtype=loss_.dtype)
   loss_ *= mask
@@ -141,18 +143,23 @@ def mask_data(inp_tok):
   tar_inp = tar_inp[:, :-1] # Drop the end token for the Decoder Input.
   tar_real = tar_real[:, 1:] # Drop the start token for what we compare to.
 
-  return (inp, tar_inp), tar_real
+  ## Need to compute weight for cross entropy loss.
+  weight = np.zeros(shape=inp.shape)
+  weight[inp.numpy() == 4] = 1
+
+  weight = weight[:, 1:]
+  return (inp, tar_inp), tar_real, tf.convert_to_tensor(weight, dtype=tf.int64)
 
 def train_step(inputs, labels):
   (inp, tar_inp) = inputs
   tar_real = labels
 
-  (inp, tar_inp), tar_real = mask_data(inp)
+  (inp, tar_inp), tar_real, weight = mask_data(inp)
 
   with tf.GradientTape() as tape:
     predictions, _ = transformer([inp, tar_inp],
                                  training = True)
-    loss = loss_function(tar_real, predictions)
+    loss = loss_function(tar_real, predictions, sample_weight=weight)
     accuracy = accuracy_function(tar_real, predictions)
 
   gradients = tape.gradient(loss, transformer.trainable_variables)
