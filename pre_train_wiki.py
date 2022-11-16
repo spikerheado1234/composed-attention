@@ -155,7 +155,7 @@ distribution = [0, 0, 0, 0] # 0, 0 < 10, 10 -50, > 50 -> gives number of NON-0 e
 def compute_distribution(inp):
   global distribution
 
-  count = tf.reduce_sum(tf.cast(tf.math.logical_not(tf.equal(tf.convert_to_tensor(inp.numpy()[1:-1]), 0)), dtype=tf.int64))
+  count = tf.reduce_sum(tf.cast(tf.math.logical_not(tf.equal(tf.convert_to_tensor(inp.numpy()[:-1]), 0)), dtype=tf.int64))
 
   if count == 0:
     distribution[0] += 1
@@ -173,7 +173,7 @@ def train_step(inputs, labels):
 
   (inp, tar_inp), tar_real, weight = mask_data(inp)
 
-  compute_distribution(inp)
+  compute_distribution(tar_real)
 
   with tf.GradientTape() as tape:
     predictions, _ = transformer([inp, tar_inp],
