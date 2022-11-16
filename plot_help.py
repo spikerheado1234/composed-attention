@@ -1,5 +1,6 @@
 import matplotlib.pyplot as plt
 import tensorflow as tf
+import numpy as np
 
 
 granularity = 500 
@@ -115,10 +116,11 @@ def plot_performance(*args):
         with open(dir, "r") as f:
             for line in f:
                 line_split = line.split()
-                run_time.append(float(line_split[3][:-1])/100)
+                run_time.append(float(line_split[3][:-1])/200)
                 seq_length.append(float(line_split[6]))
 
-        plt.plot(seq_length, run_time, line_types[line_type])
+        a, b = np.polyfit(seq_length, run_time, 1)
+        plt.plot(seq_length, a*np.array(seq_length)+b, line_types[line_type])
         line_type += 1
         headings.append(heading)
 
