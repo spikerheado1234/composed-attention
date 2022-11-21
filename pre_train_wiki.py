@@ -139,16 +139,11 @@ def mask_data(inp_tok):
   Pads the vector inputs (of size (BATCH_SIZE, SEQUENCE LENGTH)) to ensure each
   sequence length is standardized to MAX_TOKENS.
   """
-  inp, tar_inp, tar_real = mask(inp_tok, MAX_TOKENS)
+  inp, tar_inp, tar_real, sample_weights = mask(inp_tok, MAX_TOKENS)
   tar_inp = tar_inp[:, :-1] # Drop the end token for the Decoder Input.
   tar_real = tar_real[:, 1:] # Drop the start token for what we compare to.
 
-  ## Need to compute weight for cross entropy loss.
-  weight = np.zeros(shape=inp.shape)
-  weight[inp.numpy() == 4] = 1
-
-  weight = weight[:, 1:]
-  return (inp, tar_inp), tar_real, tf.convert_to_tensor(weight, dtype=tf.int64)
+  return (inp, tar_inp), tar_real, sample_weights
 
 distribution = [0, 0, 0, 0] # 0, 0 < 10, 10 -50, > 50 -> gives number of NON-0 elements excluding start and end token.
 

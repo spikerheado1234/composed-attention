@@ -121,6 +121,7 @@ def plot_performance(*args):
 
         a, b = np.polyfit(seq_length, run_time, 1)
         plt.plot(seq_length, a*np.array(seq_length)+b, line_types[line_type])
+        plt.scatter(seq_length, run_time)
         line_type += 1
         headings.append(heading)
 
@@ -147,9 +148,9 @@ def plot_performance(*args):
 #              ('/Users/Ahan/Desktop/Ahan/UIUC/PL-FOR-NAS/attention/data/vt_train_data.txt', 'Vanilla Transformer'))
 #plot_new_loss(('/Users/Ahan/Desktop/Ahan/UIUC/PL-FOR-NAS/output_one.in', 'Vanilla Transformer'))
 #plot_new_accuracy(('/Users/Ahan/Desktop/Ahan/UIUC/PL-FOR-NAS/output_one.in', 'Vanilla Transformer'))
-plot_performance(('/Users/Ahan/Desktop/Ahan/UIUC/PL-FOR-NAS/benchmark_results_MHA.txt', 'Vanilla Transformer'),
-                 ('/Users/Ahan/Desktop/Ahan/UIUC/PL-FOR-NAS/benchmark_results_CompMHA.txt', 'Lin-Perf Transformer'),
-                 ('/Users/Ahan/Desktop/Ahan/UIUC/PL-FOR-NAS/benchmark_results_LinMHA.txt', 'Linformer'))
+#plot_performance(('/Users/Ahan/Desktop/Ahan/UIUC/PL-FOR-NAS/benchmark_results_MHA.txt', 'Vanilla Transformer'),
+#                 ('/Users/Ahan/Desktop/Ahan/UIUC/PL-FOR-NAS/benchmark_results_CompMHA.txt', 'Lin-Perf Transformer'),
+#                 ('/Users/Ahan/Desktop/Ahan/UIUC/PL-FOR-NAS/benchmark_results_LinMHA.txt', 'Linformer'))
 plt.show()
 
 

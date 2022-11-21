@@ -26,11 +26,11 @@ def prepare_batch(inp):
     ## Note, inp and tar are the same. ##
     inp_tok = en_tokenizer.tokenize(inp)
 
-    inp, tar_inp, tar_real = mask(inp_tok)
+    inp, tar_inp, tar_real, sample_weights = mask(inp_tok)
     tar_inp = tar_inp[:, :-1] # Drop the end token for the Decoder Input.
     tar_real = tar_real[:, 1:] # Drop the start token for what we compare to.
 
-    return (inp, tar_inp), tar_real
+    return (inp, tar_inp), tar_real, sample_weights
 
 def make_batches(ds, BUFFER_SIZE):
   return (

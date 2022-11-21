@@ -7,6 +7,8 @@ import os
 print('loading wikitext dataset')
 
 train_dir = os.getcwd() + "/wikitext-103/wiki.train.tokens"
+valid_dir = os.getcwd() + "/wikitext-103/wiki.valid.tokens"
+test_dir = os.getcwd() + "/wikitext-103/wiki.test.tokens"
 
 ## TODO, standardize later. ##
 seed = 42
