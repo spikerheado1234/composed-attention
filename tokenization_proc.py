@@ -91,6 +91,42 @@ def masker(inp):
 
     return tf.convert_to_tensor(inp)
 
+def get_masked_input_and_labels(encoded_texts):
+    encoded_texts = encoded_texts.numpy()
+    mask_token_id = tf.argmax(tf.constant(reserved_tokens) == "[MASK]")
+
+    inp_mask = np.random.rand(*encoded_texts.shape) < 0.15
+    # Do not mask special tokens
+    inp_mask[encoded_texts <= 4] = False
+    # Set targets to -1 by default, it means ignore
+    labels = -1 * np.ones(encoded_texts.shape, dtype=int)
+    # Set labels for masked tokens
+    labels[inp_mask] = encoded_texts[inp_mask]
+
+    # Prepare input
+    encoded_texts_masked = np.copy(encoded_texts)
+    # Set input to [MASK] which is the last token for the 90% of tokens
+    # This means leaving 10% unchanged
+    inp_mask_2mask = inp_mask & (np.random.rand(*encoded_texts.shape) < 0.90)
+    encoded_texts_masked[
+        inp_mask_2mask
+    ] = mask_token_id  # mask token is the last in the dict
+
+    # Set 10% to a random token
+    inp_mask_2random = inp_mask_2mask & (np.random.rand(*encoded_texts.shape) < 1 / 9)
+    encoded_texts_masked[inp_mask_2random] = np.random.randint(
+        3, mask_token_id, inp_mask_2random.sum()
+    )
+
+    # Prepare sample_weights to pass to .fit() method
+    sample_weights = np.ones(labels.shape)
+    sample_weights[labels == -1] = 0
+
+    # y_labels would be same as encoded_texts i.e input tokens
+    y_labels = np.copy(encoded_texts)
+
+    return encoded_texts_masked, y_labels, sample_weights
+
 def pad(inp, seq_length):
     ## Now, in the event that inp is less than sequence length, we must pad with zeros accordingly. ##
     max_seq_len = inp.shape[1]
@@ -105,6 +141,7 @@ def pad(inp, seq_length):
 def mask(inp, seq_length):
 
     inp = inp.merge_dims(-2, -1).to_tensor()
+
     inp = inp[:, :seq_length]
     inp = pad(inp, seq_length)
 
@@ -115,11 +152,10 @@ def mask(inp, seq_length):
     tar_input = inp # Fed into the decoder.
     tar_real = inp # Take categorical cross entropy loss against this.
 
-    inp = masker(inp) # Fed into the encoder.
+    #inp = masker(inp) # Fed into the encoder.
+    inp, _, sample_weights = get_masked_input_and_labels(inp)
 
-    return (inp, tar_input, tar_real)
-
-
+    return (tf.convert_to_tensor(inp), tar_input, tar_real, sample_weights)
 
 """
 So the pipeline will look like this.
