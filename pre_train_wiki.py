@@ -173,7 +173,7 @@ def train_step(inputs, labels):
   with tf.GradientTape() as tape:
     predictions, _ = transformer([inp, tar_inp],
                                  training = True)
-    loss = loss_object(tar_real, predictions, sample_weight=weight[:, 1:]) / tf.cast(tf.convert_to_tensor(args.batch_size))
+    loss = loss_object(tar_real, predictions, sample_weight=weight[:, 1:]) / tf.cast(tf.convert_to_tensor(args.batch_size), dtype=tf.float32)
     accuracy = accuracy_function(tar_real, predictions, weight[:, 1:])
 
   gradients = tape.gradient(loss, transformer.trainable_variables)
