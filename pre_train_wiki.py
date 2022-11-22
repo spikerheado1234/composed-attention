@@ -100,8 +100,9 @@ def accuracy_function(real, pred):
 
 def loss_function(real, pred, sample_weight):
   loss_ = loss_object(real, pred, sample_weight=sample_weight)
-
-  return tf.reduce_sum(loss_)/tf.reduce_sum(sample_weight)
+  reduced_sum = tf.cast(tf.reduce_sum(sample_weight), dtype=tf.float32)
+  reduced_loss = tf.cast(tf.reduce_sum(loss_), dtype=tf.float32)
+  return reduced_loss / reduced_sum
 
 def perplexity_function(_loss):
 
