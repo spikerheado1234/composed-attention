@@ -458,8 +458,6 @@ class Transformer(tf.keras.Model):
       # The decoder output.
       dec_output, attention_weights = self.decoder(
           tar, enc_output, enc_mask, training)  # `(batch_size, tar_seq_len, d_model)`
-
-    if not self.encoder_only:
       # The final linear layer output.
       final_output = self.final_layer(dec_output)  # Shape `(batch_size, tar_seq_len, target_vocab_size)`.
     else:
