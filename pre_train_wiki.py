@@ -106,7 +106,7 @@ def loss_function(real, pred, sample_weight):
 
 def perplexity_function(_loss):
 
-    return tf.math.exp(_loss * -1)
+    return tf.math.exp(_loss)
 
 train_loss = tf.keras.metrics.Mean(name='train_loss')
 train_accuracy = tf.keras.metrics.Mean(name='train_accuracy')
@@ -209,7 +209,7 @@ for epoch in range(EPOCHS):
       print(f'Saved checkpoint for step: {steps_elapsed} path: {save_path}')
       ckpt.step.assign_add(1)
 
-    print(f'Steps {steps_elapsed} Epoch {epoch + 1} Batch {batch} Loss {train_loss.result():.4f} Accuracy {train_accuracy.result():.4f}', flush=True)
+    print(f'Steps {steps_elapsed} Epoch {epoch + 1} Batch {batch} Loss {train_loss.result():.4f} Perplexity: {train_perplexity.result():.4f} Accuracy {train_accuracy.result():.4f}', flush=True)
 
     with open(f'./train_data_{rank}.txt', 'a+') as f:
       f.write(f'{steps_elapsed} {train_loss.result():.4f} {train_accuracy.result():.4f}\n')
