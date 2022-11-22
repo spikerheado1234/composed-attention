@@ -21,6 +21,7 @@ parser.add_argument('--layers', dest='layers', default=4, type=int, help='the nu
 parser.add_argument('--sequence_length', dest='sequence_length', type=int, default=128, help='the sequence length of the input to the transformer')
 parser.add_argument('--step_count', dest='num_steps', type=int, default=500000, help='the number of steps as input to pre-training.')
 parser.add_argument('--rank', dest='rank', type=int, default=1, help='The rank of the process, to distinguish output.')
+parser.add_argument('--encoder_only', dest='enc_only', type=bool, default=False, help='Whether we are training in encoder only mode')
 
 args = parser.parse_args()
 
@@ -58,7 +59,8 @@ transformer = Transformer(
     dropout_rate=dropout_rate,
     downsampling_value=args.downsampling_k if args.attention_type == 'LinMHA' else 32, # Just default to 32 otherwise, doesn't matter since it won't be used.
     attention_type=args.attention_type,
-    sequence_length=args.sequence_length)
+    sequence_length=args.sequence_length,
+    encoder_only=args.enc_only)
 
 class CustomSchedule(tf.keras.optimizers.schedules.LearningRateSchedule):
   def __init__(self, d_model, warmup_steps=4000):
@@ -97,13 +99,9 @@ def accuracy_function(real, pred):
   
 
 def loss_function(real, pred, sample_weight):
-  mask = tf.math.logical_not(tf.math.equal(real, 0))
   loss_ = loss_object(real, pred, sample_weight=sample_weight)
 
-  mask = tf.cast(mask, dtype=loss_.dtype)
-  loss_ *= mask
-
-  return tf.reduce_sum(loss_)/tf.reduce_sum(mask)
+  return tf.reduce_sum(loss_)/tf.reduce_sum(sample_weight)
 
 def perplexity_function(_loss):
 
@@ -209,10 +207,6 @@ for epoch in range(EPOCHS):
       save_path = ckpt_manager.save()
       print(f'Saved checkpoint for step: {steps_elapsed} path: {save_path}')
       ckpt.step.assign_add(1)
-
-    if (steps_elapsed % 300 == 0):
-      with open(f'junk_test_{rank}.txt', 'a+') as f:
-        f.write(f'junk distribution {distribution}\n')
 
     print(f'Steps {steps_elapsed} Epoch {epoch + 1} Batch {batch} Loss {train_loss.result():.4f} Accuracy {train_accuracy.result():.4f}', flush=True)
 
