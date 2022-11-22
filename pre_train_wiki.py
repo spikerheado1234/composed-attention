@@ -98,6 +98,7 @@ def accuracy_function(real, pred, weights):
   return tf.reduce_sum(accuracies) / tf.reduce_sum(mask)
   
 
+# This seems to be a tad buggy.
 def loss_function(real, pred, sample_weight):
   loss_ = loss_object(real, pred, sample_weight=sample_weight)
   reduced_sum = tf.cast(tf.reduce_sum(sample_weight), dtype=tf.float32)
@@ -172,13 +173,15 @@ def train_step(inputs, labels):
   with tf.GradientTape() as tape:
     predictions, _ = transformer([inp, tar_inp],
                                  training = True)
-    loss = loss_function(tar_real, predictions, sample_weight=weight[:, 1:]) # We have to change the weights to make the dimensionality match.
+    #loss = loss_function(tar_real, predictions, sample_weight=weight[:, 1:]) # We have to change the weights to make the dimensionality match.
+    loss = loss_object(tar_real, predictions, sample_weight=weight[:, 1:])
     accuracy = accuracy_function(tar_real, predictions, weight[:, 1:])
 
   gradients = tape.gradient(loss, transformer.trainable_variables)
   optimizer.apply_gradients(zip(gradients, transformer.trainable_variables))
 
-  train_loss(loss)
+  train_loss.update_state(loss, sample_weight=weight[:, 1:])
+  #train_loss(loss)
   train_accuracy(accuracy)
   train_perplexity(perplexity_function(loss))
 
