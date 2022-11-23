@@ -35,9 +35,9 @@ def get_val_ds():
 
 ## Next, we use the dataset to generate the vocabulary. ##
 print('generating vocabulary')
-en_vocab = generate_vocabulary(get_all_ds(), lambda en_one: en_one)
+#en_vocab = generate_vocabulary(get_all_ds(), lambda en_one: en_one)
 
-write_vocab_file('en_vocab.txt', en_vocab)
+#write_vocab_file('en_vocab.txt', en_vocab)
 
 print('generating tokenizer')
 en_tokenizer = generate_tokenizer('en_vocab.txt', bert_tokenizer_params)
