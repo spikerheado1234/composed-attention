@@ -43,7 +43,7 @@ train_batches = make_batches(train_ds, BUFFER_SIZE, BATCH_SIZE)
 
 ## Hyperparameters ##
 num_layers = args.layers
-d_model = 256
+d_model = 512
 dff = 2048
 num_attention_heads = 8
 dropout_rate = 0.1
@@ -119,7 +119,7 @@ ckpt = tf.train.Checkpoint(step=tf.Variable(1),
                            transformer=transformer,
                            optimizer=optimizer)
 
-ckpt_manager = tf.train.CheckpointManager(ckpt, checkpoint_path, max_to_keep=5)
+ckpt_manager = tf.train.CheckpointManager(ckpt, checkpoint_path, max_to_keep=None)
 
 # If a checkpoint exists, restore the latest checkpoint.
 if ckpt_manager.latest_checkpoint:
@@ -173,7 +173,7 @@ def train_step(inputs, labels):
   with tf.GradientTape() as tape:
     predictions, _ = transformer([inp, tar_inp],
                                  training = True)
-    loss = loss_object(tar_real, predictions, sample_weight=weight[:, 1:]) / tf.cast(tf.convert_to_tensor(args.batch_size), dtype=tf.float32)
+    loss = loss_object(tar_real, predictions, sample_weight=weight[:, 1:]) 
     accuracy = accuracy_function(tar_real, predictions, weight[:, 1:])
 
   gradients = tape.gradient(loss, transformer.trainable_variables)
