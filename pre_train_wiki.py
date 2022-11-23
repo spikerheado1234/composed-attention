@@ -6,7 +6,7 @@ import time
 import argparse
 from stats import Stats 
 import os
-from pre_train_wiki_loader import get_dataset, make_batches
+from pre_train_wiki_loader import get_all_ds, get_train_ds, get_val_ds, make_batches
 from constants import Constants
 from tokenization_proc import mask
 import numpy as np
@@ -22,6 +22,7 @@ parser.add_argument('--sequence_length', dest='sequence_length', type=int, defau
 parser.add_argument('--step_count', dest='num_steps', type=int, default=500000, help='the number of steps as input to pre-training.')
 parser.add_argument('--rank', dest='rank', type=int, default=1, help='The rank of the process, to distinguish output.')
 parser.add_argument('--encoder_only', dest='enc_only', type=bool, default=False, help='Whether we are training in encoder only mode')
+parser.add_argument('--validate_mode', dest='is_val', type=bool, default=False, help='Whether we are concurrently validating as well')
 
 args = parser.parse_args()
 
@@ -33,7 +34,8 @@ MAX_TOKENS = args.sequence_length
 
 curr_dir = os.getcwd() + "/"
 
-train_ds = get_dataset()
+train_ds = get_train_ds()
+val_ds = get_val_ds()
 
 BUFFER_SIZE = 20000
 BATCH_SIZE = args.batch_size
