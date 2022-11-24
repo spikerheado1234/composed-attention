@@ -9,6 +9,7 @@ import os
 from pre_train_wiki_loader import get_all_ds, get_train_ds, get_val_ds, make_batches
 from constants import Constants
 from tokenization_proc import mask
+import tensorflow_models as tfm
 import numpy as np
 
 ## Define argument parsing and help over here. ##
@@ -80,7 +81,20 @@ class CustomSchedule(tf.keras.optimizers.schedules.LearningRateSchedule):
     return tf.math.rsqrt(self.d_model) * tf.math.minimum(arg1, arg2)
 
 learning_rate = CustomSchedule(d_model)
-optimizer = tf.keras.optimizers.Adam(learning_rate, beta_1=0.9, beta_2=0.98,
+# Lets use a new learning rate here.
+initial_learning_rate = 2e-5
+num_train_steps = args.num_steps
+warmup_steps = 10000
+linear_decay = tf.keras.optimizers.schedules.PolynomialDecay(
+    initial_learning_rate=initial_learning_rate,
+    end_learning_rate=0,
+    decay_steps=num_train_steps)
+warmup_schedule = tfm.optimization.lr_schedule.LinearWarmup(
+    warmup_learning_rate = 0,
+    after_warmup_lr_sched = linear_decay,
+    warmup_steps = warmup_steps
+)
+optimizer = tf.keras.optimizers.Adam(warmup_schedule, beta_1=0.9, beta_2=0.999,
                                     epsilon=1e-9)
 
 loss_object = tf.keras.losses.SparseCategoricalCrossentropy(

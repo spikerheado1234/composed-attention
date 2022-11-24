@@ -2,7 +2,6 @@ import matplotlib.pyplot as plt
 import tensorflow as tf
 import numpy as np
 
-
 granularity = 500 
 line_types = ['-', '-', '-', '-']
 
