@@ -45,7 +45,7 @@ train_batches = make_batches(train_ds, BUFFER_SIZE, BATCH_SIZE)
 
 ## Hyperparameters ##
 num_layers = args.layers
-d_model = 512
+d_model = 256
 dff = 2048
 num_attention_heads = 8
 dropout_rate = 0.1
@@ -183,7 +183,7 @@ def train_step(inputs, labels):
 
   train_loss.update_state(loss, sample_weight=weight[:, 1:])
   train_accuracy(accuracy)
-  train_perplexity(perplexity_function(loss))
+  train_perplexity(perplexity_function(train_loss.result()))
 
 EPOCHS = args.num_steps
 total_steps_required = args.num_steps
