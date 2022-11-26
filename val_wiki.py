@@ -24,6 +24,7 @@ parser.add_argument('--sequence_length', dest='sequence_length', type=int, defau
 parser.add_argument('--rank', dest='rank', type=int, default=1, help='The rank of the process, to distinguish output.')
 parser.add_argument('--encoder_only', dest='enc_only', type=bool, default=False, help='Whether we are training in encoder only mode')
 parser.add_argument('--num_checkpoints', dest='checkpoint_num', type=int, default=30, help='The total number of checkpoints to validate')
+parser.add_argument('--step_count', dest='num_steps', type=int, default=500000, help='the number of steps as input to pre-training.')
 
 args = parser.parse_args()
 
@@ -45,7 +46,7 @@ val_batches = make_batches(val_ds, BUFFER_SIZE, BATCH_SIZE)
 
 ## Hyperparameters ##
 num_layers = args.layers
-d_model = 256
+d_model = 512
 dff = 2048
 num_attention_heads = 8
 dropout_rate = 0.1
@@ -111,7 +112,7 @@ def perplexity_function(_loss):
 train_loss = tf.keras.metrics.Mean(name='train_loss')
 train_accuracy = tf.keras.metrics.Mean(name='train_accuracy')
 # May be buggy, but be we do NOT want to use Mean as used above. ##
-train_perplexity = tf.keras.metrics.Metric(name='train_perplexity')
+train_perplexity = tf.keras.metrics.Mean(name='train_perplexity')
 
 checkpoint_path = './checkpoints/train/' + str(rank)
 
