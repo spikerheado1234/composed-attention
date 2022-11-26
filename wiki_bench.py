@@ -133,11 +133,11 @@ def mask_data(inp_tok):
   Pads the vector inputs (of size (BATCH_SIZE, SEQUENCE LENGTH)) to ensure each
   sequence length is standardized to MAX_TOKENS.
   """
-  inp, tar_inp, tar_real = mask(inp_tok, MAX_TOKENS)
+  inp, tar_inp, tar_real, sample_weights = mask(inp_tok, MAX_TOKENS)
   tar_inp = tar_inp[:, :-1] # Drop the end token for the Decoder Input.
   tar_real = tar_real[:, 1:] # Drop the start token for what we compare to.
 
-  return (inp, tar_inp), tar_real
+  return (inp, tar_inp), tar_real, sample_weights
 
 def train_step(inputs, labels):
   (inp, tar_inp) = inputs
