@@ -6,7 +6,7 @@ import time
 import argparse
 from stats import Stats 
 import os
-from pre_train_wiki_loader import get_dataset, make_batches
+from pre_train_wiki_loader import get_train_ds, make_batches
 from constants import Constants
 from tokenization_proc import mask
 
@@ -31,7 +31,7 @@ MAX_TOKENS = args.sequence_length
 
 curr_dir = os.getcwd() + "/"
 
-train_ds = get_dataset()
+train_ds = get_train_ds()
 
 BUFFER_SIZE = 20000
 BATCH_SIZE = args.batch_size
