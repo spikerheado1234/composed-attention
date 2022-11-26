@@ -173,10 +173,10 @@ while curr_checkpoint <= num_checkpoints:
   for (batch, (inp, tar)) in enumerate(val_batches):
     train_step(inp, tar)
 
-    print(f'Checkpoint {curr_checkpoint} Batch {batch} Loss {train_loss.result():.4f} Perplexity: {train_perplexity.result():.4f} Accuracy {train_accuracy.result():.4f}', flush=True)
+  print(f'Checkpoint {curr_checkpoint} Batch {batch} Loss {train_loss.result():.4f} Perplexity: {train_perplexity.result():.4f} Accuracy {train_accuracy.result():.4f}', flush=True)
 
-    with open(f'./val_data_{rank}.txt', 'a+') as f:
-      f.write(f'{train_loss.result():.4f} {train_accuracy.result():.4f}\n')
+  with open(f'./val_data_{rank}.txt', 'a+') as f:
+    f.write(f'{train_loss.result():.4f} {train_accuracy.result():.4f}\n')
   
   curr_checkpoint += 2
   ## Restore the next checkpoint and continue. ##
