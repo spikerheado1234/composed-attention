@@ -1,0 +1,18 @@
+loading wikitext dataset
+generating vocabulary
+generating tokenizer
+Checkpoint 2 Batch 117 Loss 6.9331 Perplexity: 1015.1252 Accuracy 0.1503
+Checkpoint 4 Batch 117 Loss 6.0530 Perplexity: 429.1678 Accuracy 0.1971
+Checkpoint 6 Batch 117 Loss 5.8681 Perplexity: 354.7796 Accuracy 0.2134
+Checkpoint 8 Batch 117 Loss 5.6633 Perplexity: 295.2010 Accuracy 0.2334
+Checkpoint 10 Batch 117 Loss 5.4076 Perplexity: 229.6352 Accuracy 0.2673
+Checkpoint 12 Batch 117 Loss 5.1356 Perplexity: 165.2588 Accuracy 0.3040
+Checkpoint 14 Batch 117 Loss 4.9167 Perplexity: 138.5121 Accuracy 0.3289
+Checkpoint 16 Batch 117 Loss 4.6350 Perplexity: 100.1573 Accuracy 0.3651
+Checkpoint 18 Batch 117 Loss 4.4056 Perplexity: 82.6912 Accuracy 0.3952
+Checkpoint 20 Batch 117 Loss 4.1598 Perplexity: 66.3742 Accuracy 0.4196
+Checkpoint 22 Batch 117 Loss 4.0309 Perplexity: 55.2852 Accuracy 0.4361
+Checkpoint 24 Batch 117 Loss 3.9086 Perplexity: 51.2397 Accuracy 0.4508
+Checkpoint 26 Batch 117 Loss 3.7832 Perplexity: 42.5293 Accuracy 0.4663
+Checkpoint 28 Batch 117 Loss 3.7147 Perplexity: 41.0110 Accuracy 0.4732
+Checkpoint 30 Batch 117 Loss 3.6492 Perplexity: 37.0012 Accuracy 0.4834

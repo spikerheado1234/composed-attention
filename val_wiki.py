@@ -143,7 +143,6 @@ def mask_data(inp_tok):
 
 distribution = [0, 0, 0, 0] # 0, 0 < 10, 10 -50, > 50 -> gives number of NON-0 elements excluding start and end token.
 
-
 def train_step(inputs, labels):
 
   (inp, tar_inp) = inputs
