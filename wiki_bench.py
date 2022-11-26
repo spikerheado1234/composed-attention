@@ -143,20 +143,20 @@ def train_step(inputs, labels):
   (inp, tar_inp) = inputs
   tar_real = labels
 
-  (inp, tar_inp), tar_real = mask_data(inp)
+  (inp, tar_inp), tar_real, weight = mask_data(inp)
 
   with tf.GradientTape() as tape:
     predictions, _ = transformer([inp, tar_inp],
                                  training = True)
-    loss = loss_function(tar_real, predictions)
-    accuracy = accuracy_function(tar_real, predictions)
+    loss = loss_object(tar_real, predictions, sample_weight=weight[:, 1:]) 
+    accuracy = accuracy_function(tar_real, predictions, weight[:, 1:])
 
   gradients = tape.gradient(loss, transformer.trainable_variables)
   optimizer.apply_gradients(zip(gradients, transformer.trainable_variables))
 
-  train_loss(loss)
+  train_loss.update_state(loss, sample_weight=weight[:, 1:])
   train_accuracy(accuracy)
-  train_perplexity(perplexity_function(loss))
+  train_perplexity(perplexity_function(train_loss.result()))
 
 EPOCHS = 30
 total_steps_required = 1000
@@ -183,4 +183,4 @@ for epoch in range(EPOCHS):
 train_end = time.time()
 
 with open(f"benchmark_results_{args.attention_type}.txt", "a+") as f:
-    f.write(f"End-To-End Training time: {train_end-train_start}, sequence length: {args.sequence_length}\n")
+    f.write(f"End-To-End Training time: {train_end-train_start}, sequence length: {args.sequence_length}, downsampling value: {args.downsampling_k}\n")
