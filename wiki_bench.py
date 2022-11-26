@@ -81,11 +81,11 @@ optimizer = tf.keras.optimizers.Adam(learning_rate, beta_1=0.9, beta_2=0.98,
 loss_object = tf.keras.losses.SparseCategoricalCrossentropy(
     from_logits=True, reduction='none')
 
-def accuracy_function(real, pred):
+def accuracy_function(real, pred, weights):
 
   accuracies = tf.equal(real, tf.argmax(pred, axis=2))
 
-  mask = tf.math.logical_not(tf.math.equal(real, 0))
+  mask = tf.math.logical_not(tf.math.equal(weights, 0))
 
   accuracies = tf.math.logical_and(mask, accuracies)
 
