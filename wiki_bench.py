@@ -149,6 +149,8 @@ def train_step(inputs, labels):
   (inp, tar_inp), tar_real, weight = mask_data(inp)
 
   with tf.GradientTape() as tape:
+    if args.enc_only: ## We must then remove the end token from the input into the encoder.
+      inp = tf.convert_to_tensor(inp.numpy()[:, :-1])
     predictions, _ = transformer([inp, tar_inp],
                                  training = True)
     loss = loss_object(tar_real, predictions, sample_weight=weight[:, 1:]) 
@@ -186,4 +188,4 @@ for epoch in range(EPOCHS):
 train_end = time.time()
 
 with open(f"benchmark_results_{args.attention_type}.txt", "a+") as f:
-    f.write(f"End-To-End Training time: {train_end-train_start}, sequence length: {args.sequence_length}, downsampling value: {args.downsampling_k}\n")
+    f.write(f"End-To-End Training time: {train_end-train_start}, sequence length: {args.sequence_length}, downsampling value: {args.downsampling_k}, hidden_dim: {d_model}\n")
