@@ -464,4 +464,7 @@ class Transformer(tf.keras.Model):
       final_output = self.final_layer(enc_output) # Shape `(batch_size, tar_seq_len, target_vocab_size)`.
 
     # Return the final output and the attention weights.
-    return final_output, attention_weights
+    if not self.encoder_only:
+      return final_output, attention_weights
+    else:
+      return final_output, None ## TODO, figure out a better way to do this.
