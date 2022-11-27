@@ -20,7 +20,7 @@ parser.add_argument('--layers', dest='layers', default=4, type=int, help='the nu
 parser.add_argument('--sequence_length', dest='sequence_length', type=int, default=128, help='the sequence length of the input to the transformer')
 parser.add_argument('--step_count', dest='num_steps', type=int, default=500000, help='the number of steps as input to pre-training.')
 parser.add_argument('--rank', dest='rank', type=int, default=1, help='The rank of the process, to distinguish output.')
-parser.add_argument('--encoder_only', dest='enc_only', type=bool, default=False, help='Whether we are training in encoder only mode')
+parser.add_argument('--encoder_only', dest='enc_only', action='store_true', help='Whether we are training in encoder only mode')
 parser.add_argument('--hidden_dim', dest='hid_dim', type=int, default=512, help='The size of the hidden dimension.')
 
 args = parser.parse_args()
