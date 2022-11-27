@@ -45,7 +45,7 @@ train_batches = make_batches(train_ds, BUFFER_SIZE, BATCH_SIZE)
 num_layers = args.layers
 d_model = args.hid_dim
 dff = 2048
-num_attention_heads = 1
+num_attention_heads = 8
 dropout_rate = 0.1
 rank = args.rank
 
