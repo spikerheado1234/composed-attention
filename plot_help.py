@@ -29,57 +29,6 @@ def plot_loss(*args):
     plt.xlabel(f'step count')
     plt.ylabel('loss')
 
-def plot_new_loss(*args):
-    global line_types
-    headings = []
-    line_type = 0
-    for dir, heading in args:
-        # We plot the loss and accuracy curves for each 
-        # directory supplied.
-        loss = []
-        with open(dir, "r") as f:
-            for i, line in enumerate(f):
-                split_tokens = line.split()
-                if (len(split_tokens) > 0 and split_tokens[0] != "Steps") or (len(split_tokens) == 0):
-                    continue
-                loss.append(tf.math.exp(float(split_tokens[7])))
-
-        plt.plot(loss, line_types[line_type])
-        line_type += 1
-        headings.append(heading)
-
-    plt.legend(headings, loc='upper left')
-    plt.title('Perplexity Curves')
-    plt.xlabel(f'step count')
-    plt.ylabel('perplexity')
-
-def plot_new_accuracy(*args):
-    global line_types
-
-    headings = []
-    line_type = 0
-    for dir, heading in args:
-        # We plot the loss and accuracy curves for each 
-        # directory supplied.
-        accuracy = []
-        with open(dir, "r") as f:
-            for i, line in enumerate(f):
-                split_tokens = line.split()
-                if (len(split_tokens) > 0 and split_tokens[0] != "Steps") or (len(split_tokens) == 0):
-                    continue
-                curr_accuracy = float(split_tokens[9])
-                accuracy.append(curr_accuracy)
-
-        plt.plot(accuracy, line_types[line_type])
-        line_type += 1
-        headings.append(heading)
-
-    plt.legend(headings, loc='upper left')
-    plt.title('Accuracy Curves')
-    plt.xlabel(f'step count')
-    plt.ylabel('Accuracy')
-
-
 def plot_accuracy(*args):
     global line_types
 
@@ -112,24 +61,26 @@ def plot_performance(*args):
     for dir, heading in args:
         run_time = []
         seq_length = []
+        downsampling_value = []
         with open(dir, "r") as f:
             for line in f:
                 line_split = line.split()
-                run_time.append(float(line_split[3][:-1])/200)
-                seq_length.append(float(line_split[6]))
+                dk_val = float(line_split[-1])
+                if dk_val > 8:
+                    run_time.append(float(line_split[3][:-1]))
+                    #seq_length.append(float(line_split[6]))
+                    downsampling_value.append(dk_val)
 
-        a, b = np.polyfit(seq_length, run_time, 1)
-        plt.plot(seq_length, a*np.array(seq_length)+b, line_types[line_type])
-        plt.scatter(seq_length, run_time)
+        a, b = np.polyfit(downsampling_value, run_time, 1)
+        plt.plot(downsampling_value, a*np.array(downsampling_value)+b, line_types[line_type])
+        plt.scatter(downsampling_value, run_time, marker="+")
         line_type += 1
         headings.append(heading)
 
     plt.legend(headings, loc='upper left')
-    plt.title('Run-Time')
-    plt.xlabel(f'Sequence Length')
-    plt.ylabel('Time (s)')
-
-
+    plt.title('End-to-End Run-Time of 1000 iterations as $d_k$ varies')
+    plt.xlabel(f'$d_k$')
+    plt.ylabel('Time (s)')    
 
 #plot_loss(('/Users/Ahan/Desktop/Ahan/UIUC/PL-FOR-NAS/attention/data/vt_512s_8bs_train_data.txt', 'Vanilla Transformer'),
 #           ('/Users/Ahan/Desktop/Ahan/UIUC/PL-FOR-NAS/attention/data/pt_512s_8bs_train_data.txt', 'Performer-VT Semi-Composed'))
@@ -147,9 +98,8 @@ def plot_performance(*args):
 #              ('/Users/Ahan/Desktop/Ahan/UIUC/PL-FOR-NAS/attention/data/vt_train_data.txt', 'Vanilla Transformer'))
 #plot_new_loss(('/Users/Ahan/Desktop/Ahan/UIUC/PL-FOR-NAS/output_one.in', 'Vanilla Transformer'))
 #plot_new_accuracy(('/Users/Ahan/Desktop/Ahan/UIUC/PL-FOR-NAS/output_one.in', 'Vanilla Transformer'))
-#plot_performance(('/Users/Ahan/Desktop/Ahan/UIUC/PL-FOR-NAS/benchmark_results_MHA.txt', 'Vanilla Transformer'),
-#                 ('/Users/Ahan/Desktop/Ahan/UIUC/PL-FOR-NAS/benchmark_results_CompMHA.txt', 'Lin-Perf Transformer'),
-#                 ('/Users/Ahan/Desktop/Ahan/UIUC/PL-FOR-NAS/benchmark_results_LinMHA.txt', 'Linformer'))
+plot_performance(('/Users/Ahan/Desktop/Ahan/UIUC/PL-FOR-NAS/attention/benchmark_results_LinMHA.txt', 'Linformer'),
+                 ('/Users/Ahan/Desktop/Ahan/UIUC/PL-FOR-NAS/attention/benchmark_results_CompMHA.txt', 'Lin-Perf Transformer'))
 plt.show()
 
 

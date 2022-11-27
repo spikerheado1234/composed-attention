@@ -461,7 +461,7 @@ class Transformer(tf.keras.Model):
       # The final linear layer output.
       final_output = self.final_layer(dec_output)  # Shape `(batch_size, tar_seq_len, target_vocab_size)`.
     else:
-      final_output = self.final_layer(enc_output)
+      final_output = self.final_layer(enc_output) # Shape `(batch_size, tar_seq_len, target_vocab_size)`.
 
     # Return the final output and the attention weights.
     return final_output, attention_weights
