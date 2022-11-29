@@ -175,7 +175,7 @@ while curr_checkpoint <= num_checkpoints:
 
   print(f'Checkpoint {curr_checkpoint} Batch {batch} Loss {train_loss.result():.4f} Perplexity: {train_perplexity.result():.4f} Accuracy {train_accuracy.result():.4f}', flush=True)
 
-  with open(f'./val_data_{rank}.txt', 'a+') as f:
+  with open(f'./val_data_{args.attention_type}.txt', 'a+') as f:
     f.write(f'{train_loss.result():.4f} {train_accuracy.result():.4f}\n')
   
   curr_checkpoint += 2
