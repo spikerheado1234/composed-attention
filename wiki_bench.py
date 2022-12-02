@@ -189,3 +189,4 @@ train_end = time.time()
 
 with open(f"benchmark_results_{args.attention_type}.txt", "a+") as f:
     f.write(f"End-To-End Training time: {train_end-train_start}, sequence length: {args.sequence_length}, downsampling value: {args.downsampling_k}, hidden_dim: {d_model}\n")
+    f.write(f"MHA {Stats.mha_time:.4f} MHA-Enc {Stats.mha_enc_time:.4f} MHA-Causal {Stats.mha_causal_time:.4f} MHA-Enc-Dec {Stats.mha_enc_dec_time:.4f} FFN {Stats.ffn_time:.4f} Downsampling {Stats.downsampling_time:.4f} Kernel-Transformation {Stats.transformation_time:.4f}\n")
