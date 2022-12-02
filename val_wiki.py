@@ -114,7 +114,7 @@ train_accuracy = tf.keras.metrics.Mean(name='train_accuracy')
 # May be buggy, but be we do NOT want to use Mean as used above. ##
 train_perplexity = tf.keras.metrics.Mean(name='train_perplexity')
 
-checkpoint_path = './checkpoints/train/' + str(rank)
+checkpoint_path = './checkpoints/train/' + str(args.attention_type)
 
 ckpt = tf.train.Checkpoint(step=tf.Variable(1),
                            transformer=transformer,
