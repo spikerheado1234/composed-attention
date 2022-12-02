@@ -633,6 +633,7 @@ class Attention(tf.keras.layers.Layer):
     value = self._value_dense(value)
 
     ## We build the projection matrices if we have not already.
+    downsample_trfr_start = time.time()
     if not self._built_proj_mat:
         self._rand_mat_keys = _build_downsample_proj(self._downsample_k, (self._downsample_k, key.shape[1]))
         self._rand_mat_values = _build_downsample_proj(self._downsample_k, (self._downsample_k, value.shape[1]))
@@ -642,6 +643,7 @@ class Attention(tf.keras.layers.Layer):
     key = _downsample_mat(key, self._rand_mat_keys)
     value = _downsample_mat(value, self._rand_mat_values)
 
+    Stats.downsampling_time += time.time() - downsample_trfr_start
     if self.projection_matrix_type is None:
       projection_matrix = None
     else:
