@@ -244,6 +244,10 @@ def dist_train_step(inputs, labels):
 EPOCHS = 30
 logdir = 'logs/train'
 
+profiling_steps = 5
+
+init_batches = 10
+
 train_start = time.time()
 with strategy.scope():
 
@@ -255,6 +259,9 @@ with strategy.scope():
       train_accuracy.reset_states()
 
       # inp -> portuguese, tar -> english
+      if init_batches > 10:
+        tf.profiler.experimental.start(logdir)
+
       for (batch, (inp, tar)) in enumerate(train_batches):
         strategy.run(dist_train_step, args=(inp, tar))
 
@@ -265,6 +272,11 @@ with strategy.scope():
 
         with open('./train_stats.txt', 'a+') as f:
             f.write(f'MHA {Stats.mha_time:.4f} MHA-Enc {Stats.mha_enc_time:.4f} MHA-Causal {Stats.mha_causal_time:.4f} MHA-Enc-Dec {Stats.mha_enc_dec_time:.4f} FFN {Stats.ffn_time:.4f} Downsampling {Stats.downsampling_time:.4f} Kernel-Transformation {Stats.transformation_time:.4f}\n')
+
+        init_batches += 1
+
+        if init_batches + profiling_steps == batch:
+          tf.profiler.experimental.stop()
 
       if (epoch + 1) % 5 == 0:
         ckpt_save_path = ckpt_manager.save()
