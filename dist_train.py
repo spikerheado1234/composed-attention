@@ -91,7 +91,7 @@ num_layers = args.layers
 #d_model = 1024
 d_model = 512
 #dff = 3072
-dff = 512
+dff = 2048
 num_attention_heads = 8
 #num_attention_heads = 16
 dropout_rate = 0.1
@@ -242,6 +242,7 @@ def dist_train_step(inputs, labels):
 
 
 EPOCHS = 30
+logdir = 'logs/train'
 
 train_start = time.time()
 with strategy.scope():
