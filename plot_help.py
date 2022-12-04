@@ -24,10 +24,33 @@ def plot_loss(*args):
         line_type += 1
         headings.append(heading)
 
-    plt.legend(headings, loc='upper left')
+    plt.legend(headings, loc='upper right')
     plt.title('Loss Curves')
     plt.xlabel(f'step count')
     plt.ylabel('loss')
+
+def plot_perplexity(*args):
+    global line_types
+    headings = []
+    line_type = 0
+    for dir, heading in args:
+        # We plot the loss and accuracy curves for each 
+        # directory supplied.
+        perplexity = []
+        with open(dir, "r") as f:
+            for i, line in enumerate(f):
+                curr_loss, _ = line.split()
+                curr_perplexity = tf.math.exp(float(curr_loss))
+                if curr_perplexity < 500:
+                    perplexity.append(curr_perplexity)
+
+        plt.plot(perplexity, line_types[line_type])
+        line_type += 1
+        headings.append(heading)
+
+    plt.legend(headings, loc='upper left')
+    plt.title('Perplexity Curves')
+    plt.ylabel('Perplexity')
 
 def plot_accuracy(*args):
     global line_types
@@ -98,8 +121,11 @@ def plot_performance(*args):
 #              ('/Users/Ahan/Desktop/Ahan/UIUC/PL-FOR-NAS/attention/data/vt_train_data.txt', 'Vanilla Transformer'))
 #plot_new_loss(('/Users/Ahan/Desktop/Ahan/UIUC/PL-FOR-NAS/output_one.in', 'Vanilla Transformer'))
 #plot_new_accuracy(('/Users/Ahan/Desktop/Ahan/UIUC/PL-FOR-NAS/output_one.in', 'Vanilla Transformer'))
-plot_performance(('/Users/Ahan/Desktop/Ahan/UIUC/PL-FOR-NAS/attention/benchmark_results_LinMHA.txt', 'Linformer'),
-                 ('/Users/Ahan/Desktop/Ahan/UIUC/PL-FOR-NAS/attention/benchmark_results_CompMHA.txt', 'Lin-Perf Transformer'))
+plot_perplexity(('/Users/Ahan/Desktop/Ahan/UIUC/PL-FOR-NAS/attention/data/large-model/pre-train/trial-1/LinMHA_val_data.txt', 'Linformer'),
+                ('/Users/Ahan/Desktop/Ahan/UIUC/PL-FOR-NAS/attention/data/large-model/pre-train/trial-1/compMHA_val_data.txt', 'Lin-Perf Transformer'),
+                ('/Users/Ahan/Desktop/Ahan/UIUC/PL-FOR-NAS/attention/data/large-model/pre-train/trial-1/MHA_val_data.txt', 'Vanilla Transformer'))
+#plot_performance(('/Users/Ahan/Desktop/Ahan/UIUC/PL-FOR-NAS/attention/benchmark_results_LinMHA.txt', 'Linformer'),
+#                 ('/Users/Ahan/Desktop/Ahan/UIUC/PL-FOR-NAS/attention/benchmark_results_CompMHA.txt', 'Lin-Perf Transformer'))
 plt.show()
 
 
