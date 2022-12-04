@@ -252,6 +252,8 @@ train_start = time.time()
 with strategy.scope():
 
   def train_func():
+    global init_batches
+
     for epoch in range(EPOCHS):
       start = time.time()
 
