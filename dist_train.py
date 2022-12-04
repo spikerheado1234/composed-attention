@@ -248,6 +248,8 @@ profiling_steps = 5
 
 init_batches = 10
 
+iter_num = 0
+
 train_start = time.time()
 with strategy.scope():
 
@@ -261,24 +263,25 @@ with strategy.scope():
       train_accuracy.reset_states()
 
       # inp -> portuguese, tar -> english
-      if init_batches > 10:
+      if iter_num == init_batches:
         tf.profiler.experimental.start(logdir)
 
-      for (batch, (inp, tar)) in enumerate(train_batches):
-        strategy.run(dist_train_step, args=(inp, tar))
+      with tf.profiler.experimental.Trace('train', step_num=iter_num, _r=1):
+        for (batch, (inp, tar)) in enumerate(train_batches):
+          strategy.run(dist_train_step, args=(inp, tar))
 
-        print(f'Epoch {epoch + 1} Batch {batch} Loss {train_loss.result():.4f} Accuracy {train_accuracy.result():.4f}', flush=True)
+          print(f'Epoch {epoch + 1} Batch {batch} Loss {train_loss.result():.4f} Accuracy {train_accuracy.result():.4f}', flush=True)
 
-        with open('./train_data.txt', 'a+') as f:
-          f.write(f'{train_loss.result():.4f} {train_accuracy.result():.4f}\n')
+          with open('./train_data.txt', 'a+') as f:
+            f.write(f'{train_loss.result():.4f} {train_accuracy.result():.4f}\n')
 
-        with open('./train_stats.txt', 'a+') as f:
-            f.write(f'MHA {Stats.mha_time:.4f} MHA-Enc {Stats.mha_enc_time:.4f} MHA-Causal {Stats.mha_causal_time:.4f} MHA-Enc-Dec {Stats.mha_enc_dec_time:.4f} FFN {Stats.ffn_time:.4f} Downsampling {Stats.downsampling_time:.4f} Kernel-Transformation {Stats.transformation_time:.4f}\n')
+          with open('./train_stats.txt', 'a+') as f:
+              f.write(f'MHA {Stats.mha_time:.4f} MHA-Enc {Stats.mha_enc_time:.4f} MHA-Causal {Stats.mha_causal_time:.4f} MHA-Enc-Dec {Stats.mha_enc_dec_time:.4f} FFN {Stats.ffn_time:.4f} Downsampling {Stats.downsampling_time:.4f} Kernel-Transformation {Stats.transformation_time:.4f}\n')
 
-        init_batches += 1
+          iter_num += 1
 
-        if init_batches + profiling_steps == batch:
-          tf.profiler.experimental.stop()
+          if init_batches + profiling_steps == iter_num:
+            tf.profiler.experimental.stop()
 
       if (epoch + 1) % 5 == 0:
         ckpt_save_path = ckpt_manager.save()
