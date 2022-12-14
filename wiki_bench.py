@@ -168,6 +168,16 @@ total_steps_required = 1000
 
 steps_elapsed = 0
 
+profiling_steps = 10
+
+pre_profiling_steps = 20
+
+for idx, (inp, tar) in enumerate(train_batches):
+  train_step(inp, tar)
+
+  if idx >= pre_profiling_steps:
+    break
+
 train_start = time.time()
 for epoch in range(EPOCHS):
   start = time.time()
@@ -178,12 +188,20 @@ for epoch in range(EPOCHS):
   train_accuracy.reset_states()
   train_perplexity.reset_states()
 
-  for (batch, (inp, tar)) in enumerate(train_batches):
-    if steps_elapsed > total_steps_required:
-      break
-    train_step(inp, tar)
+  print('started experimental profiling')
+  tf.profiler.experimental.start(f'logs/{args.attention_type}')
 
-    steps_elapsed += 1
+  with tf.profiler.experimental.Trace('train', step_num=steps_elapsed, _r=1):
+    for (batch, (inp, tar)) in enumerate(train_batches):
+      if steps_elapsed > total_steps_required:
+        break
+      train_step(inp, tar)
+
+      steps_elapsed += 1
+
+  if steps_elapsed == profiling_steps:
+    print('stopping profiling')
+    tf.profiler.experimental.stop()
 
 train_end = time.time()
 
