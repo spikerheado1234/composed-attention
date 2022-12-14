@@ -227,7 +227,7 @@ for epoch in range(EPOCHS):
   train_accuracy.reset_states()
   train_perplexity.reset_states()
   print('started profiling')
-  tf.profiler.experimental.start('logs')
+  tf.profiler.experimental.start(f'logs/{args.attention_type}')
 
   with tf.profiler.experimental.Trace('train', step_num=steps_elapsed, _r=1):
     for (batch, (inp, tar)) in enumerate(train_batches):
