@@ -202,20 +202,7 @@ def train_step(inputs, labels):
 EPOCHS = args.num_steps
 total_steps_required = args.num_steps
 
-profiling_steps = 10
-
 steps_elapsed = 0
-
-# Right before we run about 20 iterations to ensure all the caches and buffers are in use to simulate "training."
-
-pre_profile_steps = 20
-
-print('running pre_profiling steps')
-for (idx, (inp, tar)) in enumerate(train_batches):
-  train_step(inp, tar)
-
-  if idx >= pre_profile_steps:
-    break
 
 train_start = time.time()
 for epoch in range(EPOCHS):
@@ -226,35 +213,28 @@ for epoch in range(EPOCHS):
   train_loss.reset_states()
   train_accuracy.reset_states()
   train_perplexity.reset_states()
-  print('started profiling')
-  tf.profiler.experimental.start(f'logs/{args.attention_type}')
 
-  with tf.profiler.experimental.Trace('train', step_num=steps_elapsed, _r=1):
-    for (batch, (inp, tar)) in enumerate(train_batches):
-      if steps_elapsed > total_steps_required:
-        break
-      train_step(inp, tar)
-      if (steps_elapsed % 1000 == 0):
-        # We print end-to-end time here just in case.
-        print(f'----------- End-to-End: {time.time() - train_start} -----------')
-      if (steps_elapsed % 5000 == 0):
-        save_path = ckpt_manager.save()
-        print(f'Saved checkpoint for step: {steps_elapsed} path: {save_path}')
-        ckpt.step.assign_add(1)
+  for (batch, (inp, tar)) in enumerate(train_batches):
+    if steps_elapsed > total_steps_required:
+      break
+    train_step(inp, tar)
+    if (steps_elapsed % 1000 == 0):
+      # We print end-to-end time here just in case.
+      print(f'----------- End-to-End: {time.time() - train_start} -----------')
+    if (steps_elapsed % 5000 == 0):
+      save_path = ckpt_manager.save()
+      print(f'Saved checkpoint for step: {steps_elapsed} path: {save_path}')
+      ckpt.step.assign_add(1)
 
-      print(f'Steps {steps_elapsed} Epoch {epoch + 1} Batch {batch} Loss {train_loss.result():.4f} Perplexity: {train_perplexity.result():.4f} Accuracy {train_accuracy.result():.4f}', flush=True)
+    print(f'Steps {steps_elapsed} Epoch {epoch + 1} Batch {batch} Loss {train_loss.result():.4f} Perplexity: {train_perplexity.result():.4f} Accuracy {train_accuracy.result():.4f}', flush=True)
 
-      with open(f'./train_data_{args.attention_type}.txt', 'a+') as f:
-        f.write(f'{steps_elapsed} {train_loss.result():.4f} {train_accuracy.result():.4f}\n')
+    with open(f'./train_data_{args.attention_type}.txt', 'a+') as f:
+      f.write(f'{steps_elapsed} {train_loss.result():.4f} {train_accuracy.result():.4f}\n')
 
-      with open(f'./train_stats_{args.attention_type}.txt', 'a+') as f:
-          f.write(f'{steps_elapsed} MHA {Stats.mha_time:.4f} MHA-Enc {Stats.mha_enc_time:.4f} MHA-Causal {Stats.mha_causal_time:.4f} MHA-Enc-Dec {Stats.mha_enc_dec_time:.4f} FFN {Stats.ffn_time:.4f} Downsampling {Stats.downsampling_time:.4f} Kernel-Transformation {Stats.transformation_time:.4f}\n')
+    with open(f'./train_stats_{args.attention_type}.txt', 'a+') as f:
+        f.write(f'{steps_elapsed} MHA {Stats.mha_time:.4f} MHA-Enc {Stats.mha_enc_time:.4f} MHA-Causal {Stats.mha_causal_time:.4f} MHA-Enc-Dec {Stats.mha_enc_dec_time:.4f} FFN {Stats.ffn_time:.4f} Downsampling {Stats.downsampling_time:.4f} Kernel-Transformation {Stats.transformation_time:.4f}\n')
 
-      steps_elapsed += 1
-
-      if steps_elapsed == profiling_steps:
-        print('closing profiler')
-        tf.profiler.experimental.stop()
+    steps_elapsed += 1
 
   if (epoch + 1) % 5 == 0:
     ckpt_save_path = ckpt_manager.save()
