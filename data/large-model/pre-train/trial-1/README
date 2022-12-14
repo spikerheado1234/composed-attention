@@ -1,0 +1,15 @@
+## Pre-training results
+
+### Setup
+Batch size: 32
+Sequence Length: 256
+Downsampling K: 64
+Number of Steps: 150k
+Layers: 10
+d_model: 512
+dff: 2048
+Attention Heads: 8
+Drouput Rate: 0.1
+
+Benchmark: Wikitext-103
+Task: Masked Language Modelling

@@ -20,10 +20,16 @@ import math
 import numpy as np
 import tensorflow as tf
 import fast_attention.util as util 
+from keras import constraints
+from keras import initializers
+from keras import regularizers
 from stats import Stats 
+import string
 import time
 
 BIG_CONSTANT = 1e8
+
+_CHR_IDX = string.ascii_lowercase
 
 def _downsample_mat(mat, rand_mat):
     """
@@ -40,6 +46,37 @@ def _downsample_mat(mat, rand_mat):
     # We then have to return back to the normal shape of: [B, K, N, H]
 
     return output
+
+def _get_output_shape(output_rank, known_last_dims):
+    return [None] * (output_rank - len(known_last_dims)) + list(known_last_dims)
+
+def _build_proj_equation(free_dims, bound_dims, output_dims):
+    """Builds an einsum equation for projections inside multi-head attention."""
+    input_str = ""
+    kernel_str = ""
+    output_str = ""
+    bias_axes = ""
+    letter_offset = 0
+    for i in range(free_dims):
+        char = _CHR_IDX[i + letter_offset]
+        input_str += char
+        output_str += char
+
+    letter_offset += free_dims
+    for i in range(bound_dims):
+        char = _CHR_IDX[i + letter_offset]
+        input_str += char
+        kernel_str += char
+
+    letter_offset += bound_dims
+    for i in range(output_dims):
+        char = _CHR_IDX[i + letter_offset]
+        kernel_str += char
+        output_str += char
+        bias_axes += char
+    equation = f"{input_str},{kernel_str}->{output_str}"
+
+    return equation, bias_axes, len(output_str)
 
 def _downsampling_shape_correct(mat_shape, rand_mat_shape):
     """
@@ -391,7 +428,15 @@ class Attention(tf.keras.layers.Layer):
                causal=False,
                projection_matrix_type=None,
                downsample_k=32, # We default this value to 32. (Currently half the batch size.)
-               nb_random_features=0):
+               nb_random_features=0,
+               use_bias=True,
+               kernel_initializer="glorot_uniform",
+               bias_initializer="zeros",
+               kernel_regularizer=None,
+               bias_regularizer=None,
+               activity_regularizer=None,
+               kernel_constraint=None,
+               bias_constraint=None):
     """Initialize Attention.
     Args:
       hidden_size: int, output dim of hidden layer.
@@ -422,6 +467,14 @@ class Attention(tf.keras.layers.Layer):
     self.nb_random_features = nb_random_features
     self._built_proj_mat = False
     self._downsample_k = downsample_k
+    self.use_bias = use_bias
+    self._kernel_initializer = initializers.get(kernel_initializer)
+    self._bias_initializer = initializers.get(bias_initializer)
+    self._kernel_regularizer = regularizers.get(kernel_regularizer)
+    self._bias_regularizer = regularizers.get(bias_regularizer)
+    self._activity_regularizer = regularizers.get(activity_regularizer)
+    self._kernel_constraint = constraints.get(kernel_constraint)
+    self._bias_constraint = constraints.get(bias_constraint)
 
   def build(self, input_shape):
     """Builds the layer."""
@@ -432,23 +485,52 @@ class Attention(tf.keras.layers.Layer):
       limit = math.sqrt(6.0 / (fan_in + fan_out))
       return tf.keras.initializers.RandomUniform(minval=-limit, maxval=limit)
 
-    attention_initializer = _glorot_initializer(input_shape.as_list()[-1],
-                                                self.hidden_size)
-    self.query_dense_layer = util.DenseEinsum(
-        output_shape=(self.num_heads, size_per_head),
-        kernel_initializer=attention_initializer,
-        use_bias=False,
-        name="query")
-    self.key_dense_layer = util.DenseEinsum(
-        output_shape=(self.num_heads, size_per_head),
-        kernel_initializer=attention_initializer,
-        use_bias=False,
-        name="key")
-    self.value_dense_layer = util.DenseEinsum(
-        output_shape=(self.num_heads, size_per_head),
-        kernel_initializer=attention_initializer,
-        use_bias=False,
-        name="value")
+    if hasattr(input_shape, "shape"):
+      self._query_shape = tf.TensorShape(input_shape.shape) 
+      self._key_shape = tf.TensorShape(input_shape.shape)
+      self._value_shape = tf.TensorShape(input_shape.shape)
+    else:
+      self._query_shape = tf.TensorShape(input_shape) 
+      self._key_shape = tf.TensorShape(input_shape)
+      self._value_shape = tf.TensorShape(input_shape)
+
+    free_dims = self._query_shape.rank - 1
+    einsum_equation, bias_axes, output_rank = _build_proj_equation(
+        free_dims, bound_dims=1, output_dims=2
+    )
+    self._query_dense = tf.keras.layers.experimental.EinsumDense(
+        einsum_equation,
+        output_shape=_get_output_shape(
+            output_rank - 1, [self.num_heads, self.hidden_size]
+        ),
+        bias_axes=bias_axes if self.use_bias else None,
+        name="query",
+        **self._get_common_kwargs_for_sublayer(),
+    )
+    einsum_equation, bias_axes, output_rank = _build_proj_equation(
+        self._key_shape.rank - 1, bound_dims=1, output_dims=2
+    )
+    self._key_dense = tf.keras.layers.experimental.EinsumDense(
+        einsum_equation,
+        output_shape=_get_output_shape(
+            output_rank - 1, [self.num_heads, self.hidden_size]
+        ),
+        bias_axes=bias_axes if self.use_bias else None,
+        name="key",
+        **self._get_common_kwargs_for_sublayer(),
+    )
+    einsum_equation, bias_axes, output_rank = _build_proj_equation(
+        self._value_shape.rank - 1, bound_dims=1, output_dims=2
+    )
+    self._value_dense = tf.keras.layers.experimental.EinsumDense(
+        einsum_equation,
+        output_shape=_get_output_shape(
+            output_rank - 1, [self.num_heads, self.hidden_size]
+        ),
+        bias_axes=bias_axes if self.use_bias else None,
+        name="value",
+        **self._get_common_kwargs_for_sublayer(),
+    )
 
     output_initializer = _glorot_initializer(self.hidden_size, self.hidden_size)
     self.output_dense_layer = util.DenseEinsum(
@@ -459,12 +541,55 @@ class Attention(tf.keras.layers.Layer):
         name="output_transform")
     super(Attention, self).build(input_shape)
 
+  def _get_common_kwargs_for_sublayer(self):
+      common_kwargs = dict(
+          kernel_regularizer=self._kernel_regularizer,
+          bias_regularizer=self._bias_regularizer,
+          activity_regularizer=self._activity_regularizer,
+          kernel_constraint=self._kernel_constraint,
+          bias_constraint=self._bias_constraint,
+      )
+      # Create new clone of kernel/bias initializer, so that we don't reuse
+      # the initializer instance, which could lead to same init value since
+      # initializer is stateless.
+      kernel_initializer = self._kernel_initializer.__class__.from_config(
+          self._kernel_initializer.get_config()
+      )
+      bias_initializer = self._bias_initializer.__class__.from_config(
+          self._bias_initializer.get_config()
+      )
+      common_kwargs["kernel_initializer"] = kernel_initializer
+      common_kwargs["bias_initializer"] = bias_initializer
+      return common_kwargs
+ 
   def get_config(self):
-    return {
-        "hidden_size": self.hidden_size,
-        "num_heads": self.num_heads,
-        "attention_dropout": self.attention_dropout,
+    config = {
+        "num_heads": self._num_heads,
+        "key_dim": self._key_dim,
+        "value_dim": self._value_dim,
+        "dropout": self._dropout,
+        "use_bias": self._use_bias,
+        "output_shape": self._output_shape,
+        "attention_axes": self._attention_axes,
+        "kernel_initializer": initializers.serialize(
+            self._kernel_initializer
+        ),
+        "bias_initializer": initializers.serialize(self._bias_initializer),
+        "kernel_regularizer": regularizers.serialize(
+            self._kernel_regularizer
+        ),
+        "bias_regularizer": regularizers.serialize(self._bias_regularizer),
+        "activity_regularizer": regularizers.serialize(
+            self._activity_regularizer
+        ),
+        "kernel_constraint": constraints.serialize(self._kernel_constraint),
+        "bias_constraint": constraints.serialize(self._bias_constraint),
+        "query_shape": self._query_shape,
+        "key_shape": self._key_shape,
+        "value_shape": self._value_shape,
     }
+    base_config = super().get_config()
+    return dict(list(base_config.items()) + list(config.items()))
 
   def call(self,
            query,
@@ -498,11 +623,17 @@ class Attention(tf.keras.layers.Layer):
     # Linearly project the query, key and value using different learned
     # projections. Splitting heads is automatically done during the linear
     # projections --> [batch_size, length, num_heads, dim_per_head].
-    query = self.query_dense_layer(query)
-    key = self.key_dense_layer(key)
-    value = self.value_dense_layer(value)
+    # `query` = [B, T, N ,H]
+    query = self._query_dense(query)
+
+    # `key` = [B, S, N, H]
+    key = self._key_dense(key)
+
+    # `value` = [B, S, N, H]
+    value = self._value_dense(value)
 
     ## We build the projection matrices if we have not already.
+    downsample_trfr_start = time.time()
     if not self._built_proj_mat:
         self._rand_mat_keys = _build_downsample_proj(self._downsample_k, (self._downsample_k, key.shape[1]))
         self._rand_mat_values = _build_downsample_proj(self._downsample_k, (self._downsample_k, value.shape[1]))
@@ -512,6 +643,7 @@ class Attention(tf.keras.layers.Layer):
     key = _downsample_mat(key, self._rand_mat_keys)
     value = _downsample_mat(value, self._rand_mat_values)
 
+    Stats.downsampling_time += time.time() - downsample_trfr_start
     if self.projection_matrix_type is None:
       projection_matrix = None
     else:
