@@ -45,7 +45,7 @@ train_batches = make_batches(train_ds, BUFFER_SIZE, BATCH_SIZE)
 num_layers = args.layers
 d_model = args.hid_dim
 dff = 2048
-num_attention_heads = 1
+num_attention_heads = 8
 dropout_rate = 0.1
 rank = args.rank
 
@@ -164,7 +164,7 @@ def train_step(inputs, labels):
   train_perplexity(perplexity_function(train_loss.result()))
 
 EPOCHS = 30
-total_steps_required = 1000
+total_steps_required = 30
 
 steps_elapsed = 0
 
@@ -172,11 +172,14 @@ profiling_steps = 10
 
 pre_profiling_steps = 20
 
+print('pre_profiling steps started', flush=True)
 for idx, (inp, tar) in enumerate(train_batches):
   train_step(inp, tar)
 
   if idx >= pre_profiling_steps:
     break
+
+print('pre_profiling steps finished', flush=True)
 
 train_start = time.time()
 for epoch in range(EPOCHS):
@@ -188,7 +191,7 @@ for epoch in range(EPOCHS):
   train_accuracy.reset_states()
   train_perplexity.reset_states()
 
-  print('started experimental profiling')
+  print('started experimental profiling', flush=True)
   tf.profiler.experimental.start(f'logs/{args.attention_type}')
 
   with tf.profiler.experimental.Trace('train', step_num=steps_elapsed, _r=1):
@@ -199,9 +202,9 @@ for epoch in range(EPOCHS):
 
       steps_elapsed += 1
 
-  if steps_elapsed == profiling_steps:
-    print('stopping profiling')
-    tf.profiler.experimental.stop()
+      if steps_elapsed == profiling_steps:
+        print('stopping profiling', flush=True)
+        tf.profiler.experimental.stop()
 
 train_end = time.time()
 

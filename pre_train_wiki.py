@@ -22,7 +22,7 @@ parser.add_argument('--layers', dest='layers', default=4, type=int, help='the nu
 parser.add_argument('--sequence_length', dest='sequence_length', type=int, default=128, help='the sequence length of the input to the transformer')
 parser.add_argument('--step_count', dest='num_steps', type=int, default=500000, help='the number of steps as input to pre-training.')
 parser.add_argument('--rank', dest='rank', type=int, default=1, help='The rank of the process, to distinguish output.')
-parser.add_argument('--encoder_only', dest='enc_only', type=bool, default=False, help='Whether we are training in encoder only mode')
+parser.add_argument('--encoder_only', dest='enc_only', action='store_true', help='Whether we are training in encoder only mode')
 parser.add_argument('--validate_mode', dest='is_val', type=bool, default=False, help='Whether we are concurrently validating as well')
 
 args = parser.parse_args()
@@ -82,9 +82,9 @@ class CustomSchedule(tf.keras.optimizers.schedules.LearningRateSchedule):
 
 learning_rate = CustomSchedule(d_model)
 # Lets use a new learning rate here.
-initial_learning_rate = 2e-5
+initial_learning_rate = 0.0001
 num_train_steps = args.num_steps
-warmup_steps = 10000
+warmup_steps = 4000
 linear_decay = tf.keras.optimizers.schedules.PolynomialDecay(
     initial_learning_rate=initial_learning_rate,
     end_learning_rate=0,
@@ -129,7 +129,7 @@ train_loss = tf.keras.metrics.Mean(name='train_loss')
 train_accuracy = tf.keras.metrics.Mean(name='train_accuracy')
 train_perplexity = tf.keras.metrics.Mean(name='train_perplexity')
 
-checkpoint_path = './checkpoints/train/' + str(args.attention_type)
+checkpoint_path = './checkpoints/train/' + str(args.attention_type) + '/' + str(initial_learning_rate)
 
 ckpt = tf.train.Checkpoint(step=tf.Variable(1),
                            transformer=transformer,
@@ -228,10 +228,10 @@ for epoch in range(EPOCHS):
 
     print(f'Steps {steps_elapsed} Epoch {epoch + 1} Batch {batch} Loss {train_loss.result():.4f} Perplexity: {train_perplexity.result():.4f} Accuracy {train_accuracy.result():.4f}', flush=True)
 
-    with open(f'./train_data_{args.attention_type}.txt', 'a+') as f:
+    with open(f'./train_data_{args.attention_type}_{args.rank}.txt', 'a+') as f:
       f.write(f'{steps_elapsed} {train_loss.result():.4f} {train_accuracy.result():.4f}\n')
 
-    with open(f'./train_stats_{args.attention_type}.txt', 'a+') as f:
+    with open(f'./train_stats_{args.attention_type}_{args.rank}.txt', 'a+') as f:
         f.write(f'{steps_elapsed} MHA {Stats.mha_time:.4f} MHA-Enc {Stats.mha_enc_time:.4f} MHA-Causal {Stats.mha_causal_time:.4f} MHA-Enc-Dec {Stats.mha_enc_dec_time:.4f} FFN {Stats.ffn_time:.4f} Downsampling {Stats.downsampling_time:.4f} Kernel-Transformation {Stats.transformation_time:.4f}\n')
 
     steps_elapsed += 1
