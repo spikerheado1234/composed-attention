@@ -3,7 +3,7 @@ import tensorflow as tf
 import numpy as np
 
 granularity = 500 
-line_types = ['-', '-', '-', '-']
+line_types = ['-', '-', '-', '-', '-', '-']
 
 def plot_loss(*args):
     global line_types
@@ -41,15 +41,14 @@ def plot_perplexity(*args):
             for i, line in enumerate(f):
                 curr_loss, _ = line.split()
                 curr_perplexity = tf.math.exp(float(curr_loss))
-                if curr_perplexity < 500:
-                    perplexity.append(curr_perplexity)
+                perplexity.append(curr_perplexity)
 
         plt.plot(perplexity, line_types[line_type])
         line_type += 1
         headings.append(heading)
 
-    plt.legend(headings, loc='upper left')
-    plt.title('Perplexity Curves')
+    plt.legend(headings, loc='upper right')
+    plt.title('Validation Perplexity Curves')
     plt.ylabel('Perplexity')
 
 def plot_accuracy(*args):
@@ -105,6 +104,9 @@ def plot_performance(*args):
     plt.xlabel(f'$d_k$')
     plt.ylabel('Time (s)')    
 
+## We set the max and min y-axis values.
+plt.ylim(0, 2000)
+
 #plot_loss(('/Users/Ahan/Desktop/Ahan/UIUC/PL-FOR-NAS/attention/data/vt_512s_8bs_train_data.txt', 'Vanilla Transformer'),
 #           ('/Users/Ahan/Desktop/Ahan/UIUC/PL-FOR-NAS/attention/data/pt_512s_8bs_train_data.txt', 'Performer-VT Semi-Composed'))
 #plot_accuracy(('/Users/Ahan/Desktop/Ahan/UIUC/PL-FOR-NAS/attention/data/vt_512s_8bs_train_data.txt', 'Vanilla Transformer'),
@@ -121,9 +123,15 @@ def plot_performance(*args):
 #              ('/Users/Ahan/Desktop/Ahan/UIUC/PL-FOR-NAS/attention/data/vt_train_data.txt', 'Vanilla Transformer'))
 #plot_new_loss(('/Users/Ahan/Desktop/Ahan/UIUC/PL-FOR-NAS/output_one.in', 'Vanilla Transformer'))
 #plot_new_accuracy(('/Users/Ahan/Desktop/Ahan/UIUC/PL-FOR-NAS/output_one.in', 'Vanilla Transformer'))
-plot_perplexity(('/Users/Ahan/Desktop/Ahan/UIUC/PL-FOR-NAS/attention/data/large-model/pre-train/trial-1/LinMHA_val_data.txt', 'Linformer'),
-                ('/Users/Ahan/Desktop/Ahan/UIUC/PL-FOR-NAS/attention/data/large-model/pre-train/trial-1/compMHA_val_data.txt', 'Lin-Perf Transformer'),
-                ('/Users/Ahan/Desktop/Ahan/UIUC/PL-FOR-NAS/attention/data/large-model/pre-train/trial-1/MHA_val_data.txt', 'Vanilla Transformer'))
+#plot_perplexity(('/Users/Ahan/Desktop/Ahan/UIUC/PL-FOR-NAS/attention/data/large-model/pre-train/trial-1/LinMHA_val_data.txt', 'Linformer'),
+#                ('/Users/Ahan/Desktop/Ahan/UIUC/PL-FOR-NAS/attention/data/large-model/pre-train/trial-1/compMHA_val_data.txt', 'Lin-Perf Transformer'),
+#                ('/Users/Ahan/Desktop/Ahan/UIUC/PL-FOR-NAS/attention/data/large-model/pre-train/trial-1/MHA_val_data.txt', 'Vanilla Transformer'))
+plot_perplexity(('/Users/Ahan/Desktop/Ahan/UIUC/PL-FOR-NAS/attention/data/large-model/lr-tune/MHA/MHA_val_data_0.1.txt', '0.1'),
+                ('/Users/Ahan/Desktop/Ahan/UIUC/PL-FOR-NAS/attention/data/large-model/lr-tune/MHA/MHA_val_data_0.01.txt', '0.01'),
+                ('/Users/Ahan/Desktop/Ahan/UIUC/PL-FOR-NAS/attention/data/large-model/lr-tune/MHA/MHA_val_data_0.001.txt', '0.001'),
+                ('/Users/Ahan/Desktop/Ahan/UIUC/PL-FOR-NAS/attention/data/large-model/lr-tune/MHA/MHA_val_data_0.0001.txt', '0.0001'),
+                ('/Users/Ahan/Desktop/Ahan/UIUC/PL-FOR-NAS/attention/data/large-model/lr-tune/MHA/MHA_val_data_1e-05.txt', '1e-05'),
+                ('/Users/Ahan/Desktop/Ahan/UIUC/PL-FOR-NAS/attention/data/large-model/lr-tune/MHA/MHA_val_data_1e-06.txt', '1e-06'))
 #plot_performance(('/Users/Ahan/Desktop/Ahan/UIUC/PL-FOR-NAS/attention/benchmark_results_LinMHA.txt', 'Linformer'),
 #                 ('/Users/Ahan/Desktop/Ahan/UIUC/PL-FOR-NAS/attention/benchmark_results_CompMHA.txt', 'Lin-Perf Transformer'))
 plt.show()
