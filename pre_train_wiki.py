@@ -23,7 +23,7 @@ parser.add_argument('--sequence_length', dest='sequence_length', type=int, defau
 parser.add_argument('--step_count', dest='num_steps', type=int, default=500000, help='the number of steps as input to pre-training.')
 parser.add_argument('--rank', dest='rank', type=int, default=1, help='The rank of the process, to distinguish output.')
 parser.add_argument('--encoder_only', dest='enc_only', action='store_true', help='Whether we are training in encoder only mode')
-parser.add_argument('--validate_mode', dest='is_val', type=bool, default=False, help='Whether we are concurrently validating as well')
+parser.add_argument('--warmup', dest='warmup', default=10000, type=int, help='The number of warmup steps required during pre-training.')
 
 args = parser.parse_args()
 
@@ -60,7 +60,7 @@ transformer = Transformer(
     input_vocab_size=Constants.wiki_vocab_size,
     target_vocab_size=Constants.wiki_vocab_size,
     dropout_rate=dropout_rate,
-    downsampling_value=args.downsampling_k if args.attention_type == 'LinMHA' else 32, # Just default to 32 otherwise, doesn't matter since it won't be used.
+    downsampling_value=args.downsampling_k if args.attention_type == 'LinMHA' or args.attention_type == 'CompMHA' else 32, # Just default to 32 otherwise, doesn't matter since it won't be used.
     attention_type=args.attention_type,
     sequence_length=args.sequence_length,
     encoder_only=args.enc_only)
@@ -84,7 +84,7 @@ learning_rate = CustomSchedule(d_model)
 # Lets use a new learning rate here.
 initial_learning_rate = 0.0001
 num_train_steps = args.num_steps
-warmup_steps = 4000
+warmup_steps = args.warmup
 linear_decay = tf.keras.optimizers.schedules.PolynomialDecay(
     initial_learning_rate=initial_learning_rate,
     end_learning_rate=0,
@@ -129,7 +129,7 @@ train_loss = tf.keras.metrics.Mean(name='train_loss')
 train_accuracy = tf.keras.metrics.Mean(name='train_accuracy')
 train_perplexity = tf.keras.metrics.Mean(name='train_perplexity')
 
-checkpoint_path = './checkpoints/train/' + str(args.attention_type) + '/' + str(initial_learning_rate)
+checkpoint_path = './checkpoints/train/' + str(args.attention_type) + '/' + str(initial_learning_rate) + '/' + str(args.warmup)
 
 ckpt = tf.train.Checkpoint(step=tf.Variable(1),
                            transformer=transformer,

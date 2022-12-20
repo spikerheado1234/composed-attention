@@ -57,7 +57,7 @@ transformer = Transformer(
     input_vocab_size=Constants.wiki_vocab_size,
     target_vocab_size=Constants.wiki_vocab_size,
     dropout_rate=dropout_rate,
-    downsampling_value=args.downsampling_k if args.attention_type == 'LinMHA' else 32, # Just default to 32 otherwise, doesn't matter since it won't be used.
+    downsampling_value=args.downsampling_k if args.attention_type == 'LinMHA' or args.attention_type == 'CompMHA' else 32, # Just default to 32 otherwise, doesn't matter since it won't be used.
     attention_type=args.attention_type,
     sequence_length=args.sequence_length,
     encoder_only=args.enc_only)
@@ -164,22 +164,9 @@ def train_step(inputs, labels):
   train_perplexity(perplexity_function(train_loss.result()))
 
 EPOCHS = 30
-total_steps_required = 30
+total_steps_required = 100
 
 steps_elapsed = 0
-
-profiling_steps = 10
-
-pre_profiling_steps = 20
-
-print('pre_profiling steps started', flush=True)
-for idx, (inp, tar) in enumerate(train_batches):
-  train_step(inp, tar)
-
-  if idx >= pre_profiling_steps:
-    break
-
-print('pre_profiling steps finished', flush=True)
 
 train_start = time.time()
 for epoch in range(EPOCHS):
@@ -191,20 +178,12 @@ for epoch in range(EPOCHS):
   train_accuracy.reset_states()
   train_perplexity.reset_states()
 
-  print('started experimental profiling', flush=True)
-  tf.profiler.experimental.start(f'logs/{args.attention_type}')
+  for (batch, (inp, tar)) in enumerate(train_batches):
+    if steps_elapsed > total_steps_required:
+      break
+    train_step(inp, tar)
 
-  with tf.profiler.experimental.Trace('train', step_num=steps_elapsed, _r=1):
-    for (batch, (inp, tar)) in enumerate(train_batches):
-      if steps_elapsed > total_steps_required:
-        break
-      train_step(inp, tar)
-
-      steps_elapsed += 1
-
-      if steps_elapsed == profiling_steps:
-        print('stopping profiling', flush=True)
-        tf.profiler.experimental.stop()
+    steps_elapsed += 1
 
 train_end = time.time()
 
