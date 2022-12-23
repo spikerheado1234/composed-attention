@@ -1,12 +1,18 @@
+import sys
+
+## First append the parent directory.
+sys.path.append('/home/ag82/composed-attention/')
+
+from vanilla_transformer import Transformer
 import tensorflow as tf
 import os
 import tensorflow_datasets as tfds
-from vanilla_transformer import Transformer
 import argparse
 import time
+import pdb ## For debugging only, TODO remove.
 
+from pre_train_wiki_loader import en_tokenizer
 from stats import Stats 
-from pre_train_wiki_loader import make_batches
 from constants import Constants
 import tensorflow_models as tfm
 from tokenization_proc import pad, add_start_end
@@ -39,6 +45,23 @@ curr_dir = os.getcwd() + "/"
 
 ## Load the IMDB dataset. ##
 train_data, val_data, test_data = tfds.load(name="imdb_reviews", split=('train[:60%]', 'test[60%:]', 'test'), as_supervised=True)
+
+## A basic preparatory function. ##
+def prepare_batch(inps, labels):
+    global en_tokenizer
+    ## Take special care to tokenize ONLY the inps. ##
+    inps_tok = en_tokenizer.tokenize(inps)
+
+    return inps_tok, labels
+
+## A function to tokenize the data. ##
+def make_batches(ds, BUFFER_SIZE, BATCH_SIZE):
+  return (
+      ds
+      .shuffle(BUFFER_SIZE)
+      .batch(BATCH_SIZE)
+      .map(prepare_batch, tf.data.AUTOTUNE)
+      .prefetch(buffer_size=tf.data.AUTOTUNE))
 
 ## Basic tokenized dataset that is batched accordingly. ##
 train_batches = make_batches(train_data, BUFFER_SIZE, BATCH_SIZE)
@@ -119,7 +142,15 @@ train_step_signature = [
 ]
 
 ## Then, we create a new model to finetune. ##
-downstream_model = tf.keras.Sequential(transformer, tf.keras.layers.Dense(1, activation=tf.keras.activations.sigmoid))
+def create_downstream_model():
+  visible = tf.keras.layers.Input(shape=(args.sequence_length,)) ## TODO, this will have to change.
+  hidden_one = transformer(visible)
+  interim_output = tf.keras.layers.Dense(64, activatione=tf.keras.activations.relu)(hidden_one) ## Hyperparameter that may change later.
+  final_output = tf.keras.layers.Dense(1, activation=tf.keras.activations.sigmoid)(interim_output)
+  downstream_model = tf.keras.models.Model(inputs=visible, outputs=final_output)
+  return downstream_model
+
+downstream_model = create_downstream_model()
 
 ## TODO, check for correctness. ##
 def pad_data(inp_tok, review):
@@ -136,8 +167,10 @@ def pad_data(inp_tok, review):
   ## Then we drop the last two tokens and add the start and last token.
   inp = inp[:, :-2]
   inp = add_start_end(inp)
-
   ## Now the inp will be fed into the encoder. ##
+
+  ## first resize the reviews. ##
+  review = tf.reshape(review, [review.shape[0], 1])
   review = add_start_end(review)
   tar_inp = review[:, :-1] ## Remove the end token for the review. Will be fed into the decoder.
   tar_real = review[:, 1:] ## Remove the start token for the comparison of the reivew. 
@@ -178,14 +211,11 @@ for epoch in range(EPOCHS):
   for (batch, (inp, tar)) in enumerate(train_batches):
     if steps_elapsed > total_steps_required:
       break
+    pdb.set_trace()
     train_step(inp, tar)
     if (steps_elapsed % 1000 == 0):
       # We print end-to-end time here just in case.
       print(f'----------- End-to-End: {time.time() - train_start} -----------')
-    if (steps_elapsed % 5000 == 0):
-      save_path = ckpt_manager.save()
-      print(f'Saved checkpoint for step: {steps_elapsed} path: {save_path}')
-      ckpt.step.assign_add(1)
 
     print(f'Steps {steps_elapsed} Epoch {epoch + 1} Batch {batch} Loss {train_loss.result():.4f} Perplexity: {train_perplexity.result():.4f} Accuracy {train_accuracy.result():.4f}', flush=True)
 
@@ -196,11 +226,6 @@ for epoch in range(EPOCHS):
         f.write(f'{steps_elapsed} MHA {Stats.mha_time:.4f} MHA-Enc {Stats.mha_enc_time:.4f} MHA-Causal {Stats.mha_causal_time:.4f} MHA-Enc-Dec {Stats.mha_enc_dec_time:.4f} FFN {Stats.ffn_time:.4f} Downsampling {Stats.downsampling_time:.4f} Kernel-Transformation {Stats.transformation_time:.4f}\n')
 
     steps_elapsed += 1
-
-  if (epoch + 1) % 5 == 0:
-    ckpt_save_path = ckpt_manager.save()
-    print(f'Saving checkpoint for epoch {epoch+1} at {ckpt_save_path}', flush=True)
-
 
   print(f'Epoch {epoch + 1} Loss {train_loss.result():.4f} Accuracy {train_accuracy.result():.4f}', flush=True)
 
