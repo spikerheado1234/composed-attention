@@ -112,9 +112,10 @@ loss_object = tf.keras.losses.BinaryCrossentropy(from_logits=False, reduction='n
 ## TODO, come back to this later. ## TODO, sanity check this.
 def accuracy_function(real, pred):
   ## We delete whatever corresponds to the [END] token over here. 
-  accuracies = tf.equal(real, tf.argmax(tf.round(tf.convert_to_tensor(pred.numpy()[:, -1])), axis=2))
+  pdb.set_trace()
+  accuracies = tf.math.equal(tf.cast(real, dtype=tf.int64), tf.cast(tf.round(pred), dtype=tf.int64))
   accuracies = tf.cast(accuracies, dtype=tf.float32)
-  return tf.reduce_sum(accuracies) / tf.convert_to_tensor(real.shape[0], dtype=tf.float32) ## We must divide by the batch size to get a true accuracy estimate.
+  return tf.reduce_sum(accuracies) / tf.reduce_sum(tf.ones(shape=real.shape, dtype=tf.float32)) ## Divide by batch * seq to get accuracy over everything.
   
 train_loss = tf.keras.metrics.Mean(name='train_loss')
 train_accuracy = tf.keras.metrics.Mean(name='train_accuracy')
@@ -148,11 +149,11 @@ class DownstreamModel(tf.keras.Model):
     self.transformer = transformer
 
     ## We create more interim dense layers as well. ##
-    self.layer_one = tf.keras.layers.Dense(64, activations=tf.keras.activations.relu) ## A hyperparameter that we will tune later.
-    self.layer_two = tf.keras.layers.Dense(1, activations=tf.keras.activations.sigmoid)
+    self.layer_one = tf.keras.layers.Dense(64, activation=tf.keras.activations.relu) ## A hyperparameter that we will tune later.
+    self.layer_two = tf.keras.layers.Dense(1, activation=tf.keras.activations.sigmoid)
 
   def call(self, inp): ## Keras requires only one input, so we pass in a list.
-    out = self.transformer(inp)
+    out , _ = self.transformer(inp)
     out = self.layer_one(out)
     out = self.layer_two(out)
     return out
@@ -183,7 +184,7 @@ def pad_data(inp_tok, review):
   tar_inp = review[:, :-1] ## Remove the end token for the review. Will be fed into the decoder.
   tar_real = review[:, 1:] ## Remove the start token for the comparison of the reivew. 
 
-  return (inp, tar_inp), tar_real 
+  return (inp, tar_inp), tar_real[:, :-1] ## Also remove the last token from tar_real.
 
 def train_step(inputs, labels):
 
@@ -192,6 +193,7 @@ def train_step(inputs, labels):
   with tf.GradientTape() as tape:
     predictions, _ = downstream_model([inp, tar_inp],
                                       training = True)
+    ## we have to recast the predictions. 
     loss = loss_object(tar_real, predictions) 
     accuracy = accuracy_function(tar_real, predictions)
 
@@ -219,7 +221,6 @@ for epoch in range(EPOCHS):
   for (batch, (inp, tar)) in enumerate(train_batches):
     if steps_elapsed > total_steps_required:
       break
-    pdb.set_trace()
     train_step(inp, tar)
     if (steps_elapsed % 1000 == 0):
       # We print end-to-end time here just in case.
