@@ -142,15 +142,23 @@ train_step_signature = [
 ]
 
 ## Then, we create a new model to finetune. ##
-def create_downstream_model():
-  visible = tf.keras.layers.Input(shape=(args.sequence_length,)) ## TODO, this will have to change.
-  hidden_one = transformer(visible)
-  interim_output = tf.keras.layers.Dense(64, activatione=tf.keras.activations.relu)(hidden_one) ## Hyperparameter that may change later.
-  final_output = tf.keras.layers.Dense(1, activation=tf.keras.activations.sigmoid)(interim_output)
-  downstream_model = tf.keras.models.Model(inputs=visible, outputs=final_output)
-  return downstream_model
+class DownstreamModel(tf.keras.Model):
+  def __init__(self, transformer):
+    super(DownstreamModel, self).__init__()
+    self.transformer = transformer
 
-downstream_model = create_downstream_model()
+    ## We create more interim dense layers as well. ##
+    self.layer_one = tf.keras.layers.Dense(64, activations=tf.keras.activations.relu) ## A hyperparameter that we will tune later.
+    self.layer_two = tf.keras.layers.Dense(1, activations=tf.keras.activations.sigmoid)
+
+  def call(self, inp): ## Keras requires only one input, so we pass in a list.
+    out = self.transformer(inp)
+    out = self.layer_one(out)
+    out = self.layer_two(out)
+    return out
+
+## Instantiate our new model over here. ##
+downstream_model = DownstreamModel(transformer)
 
 ## TODO, check for correctness. ##
 def pad_data(inp_tok, review):
