@@ -81,10 +81,8 @@ class RaceLoader:
                     dec_tensor = tf.concat([dec_tensor, dec_inp], axis=0)
                     answer_tensor = tf.concat([answer_tensor, ans_inp], axis=0)
                 count += 1                
-        except Exception as e:
+        except StopIteration as e:
             ## Over here we have finished iterating over the dataset.
-            
-            ## TODO, assert that e is indeed a StopIteration error.
             
             ## We set the boolean flag of whether has_train_stopped to True.
             self.has_train_stopped = True
