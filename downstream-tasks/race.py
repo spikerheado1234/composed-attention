@@ -44,27 +44,99 @@ BATCH_SIZE = args.batch_size
 curr_dir = os.getcwd() + "/"
 
 ## Load the IMDB dataset. ##
-train_data, val_data, test_data = tfds.load(name="imdb_reviews", split=('train[:60%]', 'test[60%:]', 'test'), as_supervised=True)
+train_data, val_data, test_data = tfds.load(name="race", split=('train[:60%]', 'test[60%:]', 'test'))
 
-## A basic preparatory function. ##
-def prepare_batch(inps, labels):
-    global en_tokenizer
-    ## Take special care to tokenize ONLY the inps. ##
-    inps_tok = en_tokenizer.tokenize(inps)
+## RACE is fundamentally different in that we have to build our own custom data loader. ##
+class RaceLoader:
+    def __init__(self, train_data, val_data, batch_size):
+        self.train_data = train_data
+        self.val_data = val_data
+        self.batch_size = batch_size
+        
+        self.train_iter = iter(train_data)
+        self.val_iter = iter(val_data)
+        
+        self.has_train_stopped = False
+        self.has_val_stopped = False
+        
+    def has_more_train_data(self):
+        return not self.has_train_stopped
+        
+    def reset_train_data(self):
+        self.has_train_stopped = False
+        self.train_iter = iter(train_data)
+        
+    def gen_next_train_batch(self):
+        assert self.has_train_stopped == False, "No more training data is left! Please call the reset function"
+        ## Initialize empty tensors.
+        enc_tensor, dec_tensor, answer_tensor = None, None, None
+        try:
+            count = 0
+            while count < self.batch_size:
+                if count == 0:
+                    enc_tensor, dec_tensor, answer_tensor = self.prepare_single_inp(next(self.train_iter))
+                else:
+                    enc_inp, dec_inp, ans_inp = self.prepare_single_inp(next(self.train_iter))
+                    enc_tensor = tf.concat([enc_tensor, enc_inp], axis=0)
+                    dec_tensor = tf.concat([dec_tensor, dec_inp], axis=0)
+                    answer_tensor = tf.concat([answer_tensor, ans_inp], axis=0)
+                count += 1                
+        except Exception as e:
+            ## Over here we have finished iterating over the dataset.
+            
+            ## TODO, assert that e is indeed a StopIteration error.
+            
+            ## We set the boolean flag of whether has_train_stopped to True.
+            self.has_train_stopped = True
+            return enc_tensor, dec_tensor, answer_tensor
+        
+        return enc_tensor, dec_tensor, answer_tensor
 
-    return inps_tok, labels
+        
+    def prepare_single_inp(self, inp_dict): ## inp_dict mapping: {answers, article, example_id, options, questions}
+        article = inp_dict['article']
+        options = inp_dict['options']
+        questions = inp_dict['questions']
+        answers = inp_dict['answers']
+        article_np = article.numpy()
+        questions_np = questions.numpy()[:, :1][0] ## Grab the first question.
+        answers_np = answers.numpy()[:, :1][0] ## Grab the first answer.
+        options_np = options.numpy()[:, :1][0][0] ## Grab the list of the first options.
+        enc_str = article_np[0] + b' CLASS ' + questions_np[0] + b' CLASS '
+        for idx, opt in enumerate(options_np):
+            if idx == len(options_np) - 1: ## This is the last concat we are doing.
+                enc_str += opt
+            else:
+                enc_str += opt + b' SEP '
+        ## We return a tensor of: concat(article, [SEP], question)
+        ## alognside the answer
+        dec_str = b'START ' + answers_np[0]
+        answer_str = answers_np[0] + b' END'
+        return tf.convert_to_tensor([[enc_str]]), tf.convert_to_tensor([[dec_str]]), tf.convert_to_tensor([[answer_str]])
 
-## A function to tokenize the data. ##
-def make_batches(ds, BUFFER_SIZE, BATCH_SIZE):
-  return (
-      ds
-      .shuffle(BUFFER_SIZE)
-      .batch(BATCH_SIZE)
-      .map(prepare_batch, tf.data.AUTOTUNE)
-      .prefetch(buffer_size=tf.data.AUTOTUNE))
+## We instantiate and create our data Loader. ##
+train_data = train_data.batch(1)
+val_data = val_data.batch(1)
+raceLoader = RaceLoader(train_data, val_data, args.batch_size)
 
-## Basic tokenized dataset that is batched accordingly. ##
-train_batches = make_batches(train_data, BUFFER_SIZE, BATCH_SIZE)
+## Now, we have to create our downstream model. ##
+class DownstreamModel(tf.keras.Model):
+
+    def __init__(self, transformer):
+        super(DownstreamModel, self).__init__()
+
+        self.transformer = transformer
+
+        ## Then, we create additional FFNs. ##
+        self.layer_one = tf.keras.layers.Dense(64, activation=tf.keras.activations.relu) ## Another hyperparameter that we must tune. 
+        self.layer_two = tf.keras.layers.Dense(4, activation=tf.keras.activations.sigmoid) ## The last layer should have four options.
+
+    def call(self, inp):
+        out, _ = self.transformer(inp)
+        out = self.layer_one(out)
+        out = self.layer_two(out)
+
+        return out
 
 ## We define our transformer here. ##
 num_layers = args.layers
@@ -105,9 +177,9 @@ optimizer = tf.keras.optimizers.Adam(warmup_schedule, beta_1=0.9, beta_2=0.999,
                                     epsilon=1e-9)
 
 ## We create our loss function. ##
-loss_object = tf.keras.losses.BinaryCrossentropy(from_logits=False, reduction='none')
 
-## Next, we create helper methods to compute accuracy and loss. ##
+## TODO, check for correctness. ##
+loss_object = tf.keras.losses.CategoricalCrossentropy(from_logits=True, reduction='none')
 
 ## TODO, come back to this later. ## TODO, sanity check this.
 def accuracy_function(real, pred):
@@ -141,60 +213,40 @@ train_step_signature = [
     tf.TensorSpec(shape=(None, None), dtype=tf.int64),
 ]
 
-## Then, we create a new model to finetune. ##
-class DownstreamModel(tf.keras.Model):
-  def __init__(self, transformer):
-    super(DownstreamModel, self).__init__()
-    self.transformer = transformer
-
-    ## We create more interim dense layers as well. ##
-    self.layer_one = tf.keras.layers.Dense(64, activation=tf.keras.activations.relu) ## A hyperparameter that we will tune later.
-    self.layer_two = tf.keras.layers.Dense(1, activation=tf.keras.activations.sigmoid)
-
-  def call(self, inp): ## Keras requires only one input, so we pass in a list.
-    out , _ = self.transformer(inp)
-    out = self.layer_one(out)
-    out = self.layer_two(out)
-    return out
-
-## Instantiate our new model over here. ##
+## Now, we can instantiate our downstream model. ##
 downstream_model = DownstreamModel(transformer)
 
-## TODO, check for correctness. ##
-def pad_data(inp_tok, review):
-  global MAX_TOKENS 
+## TODO, this will need to be changed. ##
+def pad_data(enc_inp, dec_inp, answer):
+  global MAX_TOKENS, en_tokenizer
   """
   Pads the vector inputs (of size (BATCH_SIZE, SEQUENCE LENGTH)) to ensure each
   sequence length is standardized to MAX_TOKENS.
   """
-  inp = inp_tok.merge_dims(-2, -1).to_tensor()
+  enc_tok = en_tokenizer.tokenize(enc_inp)
+  dec_tok = en_tokenizer.tokenize(dec_inp)
 
-  inp = inp[:, :MAX_TOKENS]
-  inp = pad(inp, MAX_TOKENS)
+  enc_inp = enc_tok.merge_dims(-2, -1).to_tensor()
+  dec_inp = dec_tok.merge_dims(-2, -1).to_tensor()
 
-  ## Then we drop the last two tokens and add the start and last token.
-  inp = inp[:, :-2]
-  inp = add_start_end(inp)
-  ## Now the inp will be fed into the encoder. ##
+  enc_inp = enc_inp[:, :MAX_TOKENS]
+  enc_inp = pad(enc_inp, MAX_TOKENS)
 
-  ## first resize the reviews. ##
-  review = tf.reshape(review, [review.shape[0], 1])
-  review = add_start_end(review)
-  tar_inp = review[:, :-1] ## Remove the end token for the review. Will be fed into the decoder.
-  tar_real = review[:, 1:] ## Remove the start token for the comparison of the reivew. 
+  dec_inp = dec_inp[:, :MAX_TOKENS]
+  dec_inp = pad(dec_inp, MAX_TOKENS)
 
-  return (inp, tar_inp), tar_real[:, :-1] ## Also remove the last token from tar_real.
+  return (enc_inp, dec_inp), answer ## Also remove the last token from tar_real.
 
-def train_step(inputs, labels):
+def train_step(enc_inp, dec_inp, answer):
 
-  (inp, tar_inp), tar_real = pad_data(inputs, labels)
+  enc_inp, dec_inp, answer = pad_data(enc_inp, dec_inp, answer)
 
   with tf.GradientTape() as tape:
-    predictions, _ = downstream_model([inp, tar_inp],
+    predictions, _ = downstream_model([enc_inp, dec_inp],
                                       training = True)
     ## we have to recast the predictions. 
-    loss = loss_object(tar_real, predictions) 
-    accuracy = accuracy_function(tar_real, predictions)
+    loss = loss_object(answer, predictions) 
+    accuracy = accuracy_function(answer, predictions)
 
   gradients = tape.gradient(loss, downstream_model.trainable_variables)
   optimizer.apply_gradients(zip(gradients, downstream_model.trainable_variables))
@@ -211,16 +263,20 @@ steps_elapsed = 0
 train_start = time.time()
 for epoch in range(EPOCHS):
   start = time.time()
+  batch = 0
   if steps_elapsed > total_steps_required:
     break
 
   train_loss.reset_states()
   train_accuracy.reset_states()
 
-  for (batch, (inp, tar)) in enumerate(train_batches):
+  ## We set a debugging statement over here. ##
+  pdb.set_trace()
+  while raceLoader.has_more_train_data():
     if steps_elapsed > total_steps_required:
       break
-    train_step(inp, tar)
+    enc_inp, dec_inp, answer = raceLoader.gen_next_train_batch()
+    train_step(enc_inp, dec_inp, answer)
     if (steps_elapsed % 1000 == 0):
       # We print end-to-end time here just in case.
       print(f'----------- End-to-End: {time.time() - train_start} -----------')
@@ -234,12 +290,16 @@ for epoch in range(EPOCHS):
         f.write(f'{steps_elapsed} MHA {Stats.mha_time:.4f} MHA-Enc {Stats.mha_enc_time:.4f} MHA-Causal {Stats.mha_causal_time:.4f} MHA-Enc-Dec {Stats.mha_enc_dec_time:.4f} FFN {Stats.ffn_time:.4f} Downsampling {Stats.downsampling_time:.4f} Kernel-Transformation {Stats.transformation_time:.4f}\n')
 
     steps_elapsed += 1
+    batch += 1
 
   print(f'Epoch {epoch + 1} Loss {train_loss.result():.4f} Accuracy {train_accuracy.result():.4f}', flush=True)
 
   print(f'Time taken for 1 epoch: {time.time() - start:.2f} secs\n', flush=True)
-
+  
+  ## Lastly, we reset the training data. ##
+  raceLoader.reset_train_data()
 
 train_end = time.time()
 
 print(f'Total training time: {train_end-train_start}\n', flush=True)
+
