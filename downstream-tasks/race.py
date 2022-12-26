@@ -102,16 +102,16 @@ class RaceLoader:
         questions_np = questions.numpy()[:, :1][0] ## Grab the first question.
         answers_np = answers.numpy()[:, :1][0] ## Grab the first answer.
         options_np = options.numpy()[:, :1][0][0] ## Grab the list of the first options.
-        enc_str = article_np[0] + b' CLASS ' + questions_np[0] + b' CLASS '
+        enc_str = article_np[0] + b' [CLASS] ' + questions_np[0] + b' [CLASS] '
         for idx, opt in enumerate(options_np):
             if idx == len(options_np) - 1: ## This is the last concat we are doing.
                 enc_str += opt
             else:
-                enc_str += opt + b' SEP '
+                enc_str += opt + b' [SEP] '
         ## We return a tensor of: concat(article, [SEP], question)
         ## alognside the answer
-        dec_str = b'START ' + answers_np[0]
-        answer_str = answers_np[0] + b' END'
+        dec_str = answers_np[0]
+        answer_str = answers_np[0]
         return tf.convert_to_tensor([[enc_str]]), tf.convert_to_tensor([[dec_str]]), tf.convert_to_tensor([[answer_str]])
 
 ## We instantiate and create our data Loader. ##
@@ -179,7 +179,7 @@ optimizer = tf.keras.optimizers.Adam(warmup_schedule, beta_1=0.9, beta_2=0.999,
 ## We create our loss function. ##
 
 ## TODO, check for correctness. ##
-loss_object = tf.keras.losses.CategoricalCrossentropy(from_logits=True, reduction='none')
+loss_object = tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True, reduction='none')
 
 ## TODO, come back to this later. ## TODO, sanity check this.
 def accuracy_function(real, pred):
@@ -226,16 +226,22 @@ def pad_data(enc_inp, dec_inp, answer):
   enc_tok = en_tokenizer.tokenize(enc_inp)
   dec_tok = en_tokenizer.tokenize(dec_inp)
 
-  enc_inp = enc_tok.merge_dims(-2, -1).to_tensor()
-  dec_inp = dec_tok.merge_dims(-2, -1).to_tensor()
+  enc_inp = enc_tok.merge_dims(-2, -1).merge_dims(-2, -1).to_tensor()
+  dec_inp = dec_tok.merge_dims(-2, -1).merge_dims(-2, -1).to_tensor()
 
   enc_inp = enc_inp[:, :MAX_TOKENS]
   enc_inp = pad(enc_inp, MAX_TOKENS)
 
-  dec_inp = dec_inp[:, :MAX_TOKENS]
-  dec_inp = pad(dec_inp, MAX_TOKENS)
+  ## add the start and end tokens. ##
+  enc_inp = enc_inp[:, :-2]
+  enc_inp = add_start_end(enc_inp)
+  
+  dec_inp = add_start_end(dec_inp)
 
-  return (enc_inp, dec_inp), answer ## Also remove the last token from tar_real.
+  answer = dec_inp[:, 1:] ## Remove the first token from the answer.
+  dec_inp = dec_inp[:, :-1] ## remove the last token from the decoder output.
+
+  return enc_inp, dec_inp, answer ## Also remove the last token from tar_real.
 
 def train_step(enc_inp, dec_inp, answer):
 
@@ -253,7 +259,6 @@ def train_step(enc_inp, dec_inp, answer):
 
   train_loss.update_state(loss)
   train_accuracy(accuracy)
-
 
 EPOCHS = 30
 total_steps_required = args.num_steps
