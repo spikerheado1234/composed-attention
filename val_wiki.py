@@ -26,6 +26,7 @@ parser.add_argument('--encoder_only', dest='enc_only', type=bool, default=False,
 parser.add_argument('--num_checkpoints', dest='checkpoint_num', type=int, default=30, help='The total number of checkpoints to validate')
 parser.add_argument('--step_count', dest='num_steps', type=int, default=500000, help='the number of steps as input to pre-training.')
 parser.add_argument('--learning_rate', dest='lr_rate', type=float, default=0.1, help='the largest constant in the lr schedule.')
+parser.add_argument('--warmup', dest='warmup', default=10000, type=int, help='The number of warmup steps required during pre-training.')
 
 args = parser.parse_args()
 
@@ -115,7 +116,7 @@ train_accuracy = tf.keras.metrics.Mean(name='train_accuracy')
 # May be buggy, but be we do NOT want to use Mean as used above. ##
 train_perplexity = tf.keras.metrics.Mean(name='train_perplexity')
 
-checkpoint_path = './checkpoints/train/' + str(args.attention_type) + f'/{str(args.lr_rate)}'
+checkpoint_path = './checkpoints/train/' + str(args.attention_type) + f'/{str(args.lr_rate)}/{args.warmup}'
 
 ckpt = tf.train.Checkpoint(step=tf.Variable(1),
                            transformer=transformer,
@@ -176,7 +177,7 @@ while curr_checkpoint <= num_checkpoints:
 
   print(f'Checkpoint {curr_checkpoint} Batch {batch} Loss {train_loss.result():.4f} Perplexity: {train_perplexity.result():.4f} Accuracy {train_accuracy.result():.4f}', flush=True)
 
-  with open(f'./{args.attention_type}_val_data_{args.lr_rate}.txt', 'a+') as f:
+  with open(f'./{args.attention_type}_val_data_{args.lr_rate}_{args.warmup}.txt', 'a+') as f:
     f.write(f'{train_loss.result():.4f} {train_accuracy.result():.4f}\n')
   
   curr_checkpoint += 2
