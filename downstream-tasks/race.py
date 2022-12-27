@@ -9,6 +9,7 @@ import os
 import tensorflow_datasets as tfds
 import argparse
 import time
+import numpy as np
 import pdb ## For debugging only, TODO remove.
 
 from pre_train_wiki_loader import en_tokenizer
@@ -214,13 +215,25 @@ train_step_signature = [
 ## Now, we can instantiate our downstream model. ##
 downstream_model = DownstreamModel(transformer)
 
+char_to_num_dict = {b'a': 1, b'b': 2, b'c': 3, b'd': 4}
+
 ## TODO, this will need to be changed. ##
 def pad_data(enc_inp, dec_inp, answer):
-  global MAX_TOKENS, en_tokenizer
+  global MAX_TOKENS, en_tokenizer, char_to_num_dict
   """
   Pads the vector inputs (of size (BATCH_SIZE, SEQUENCE LENGTH)) to ensure each
   sequence length is standardized to MAX_TOKENS.
   """
+  ## First, we prepare the answer
+  answer = dec_inp
+
+  answer_np = answer.numpy()
+  np.char.replace(answer_np, b'A ', b'1 ')
+  np.char.replace(answer_np, b'B ', b'2 ')
+  np.char.replace(answer_np, b'C ', b'3 ')
+  np.char.replace(answer_np, b'D ', b'4 ')
+
+  ## We convert answer to ensure that when cross-entropy loss is computed, all is well.
   enc_tok = en_tokenizer.tokenize(enc_inp)
   dec_tok = en_tokenizer.tokenize(dec_inp)
 
@@ -236,7 +249,6 @@ def pad_data(enc_inp, dec_inp, answer):
   
   dec_inp = add_start_end(dec_inp)
 
-  answer = dec_inp[:, 1:] ## Remove the first token from the answer.
   dec_inp = dec_inp[:, :-1] ## remove the last token from the decoder output.
 
   return enc_inp, dec_inp, answer ## Also remove the last token from tar_real.
@@ -279,6 +291,8 @@ for epoch in range(EPOCHS):
     if steps_elapsed > total_steps_required:
       break
     enc_inp, dec_inp, answer = raceLoader.gen_next_train_batch()
+    
+    ## Add time stub before and after. ##
     train_step(enc_inp, dec_inp, answer)
     if (steps_elapsed % 1000 == 0):
       # We print end-to-end time here just in case.
