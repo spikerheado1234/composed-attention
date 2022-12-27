@@ -105,7 +105,7 @@ def plot_performance(*args):
     plt.ylabel('Time (s)')    
 
 ## We set the max and min y-axis values.
-plt.ylim(0, 2000)
+plt.ylim(0, 250)
 
 #plot_loss(('/Users/Ahan/Desktop/Ahan/UIUC/PL-FOR-NAS/attention/data/vt_512s_8bs_train_data.txt', 'Vanilla Transformer'),
 #           ('/Users/Ahan/Desktop/Ahan/UIUC/PL-FOR-NAS/attention/data/pt_512s_8bs_train_data.txt', 'Performer-VT Semi-Composed'))
@@ -126,12 +126,10 @@ plt.ylim(0, 2000)
 #plot_perplexity(('/Users/Ahan/Desktop/Ahan/UIUC/PL-FOR-NAS/attention/data/large-model/pre-train/trial-1/LinMHA_val_data.txt', 'Linformer'),
 #                ('/Users/Ahan/Desktop/Ahan/UIUC/PL-FOR-NAS/attention/data/large-model/pre-train/trial-1/compMHA_val_data.txt', 'Lin-Perf Transformer'),
 #                ('/Users/Ahan/Desktop/Ahan/UIUC/PL-FOR-NAS/attention/data/large-model/pre-train/trial-1/MHA_val_data.txt', 'Vanilla Transformer'))
-plot_perplexity(('/Users/Ahan/Desktop/Ahan/UIUC/PL-FOR-NAS/attention/data/large-model/lr-tune/MHA/MHA_val_data_0.1.txt', '0.1'),
-                ('/Users/Ahan/Desktop/Ahan/UIUC/PL-FOR-NAS/attention/data/large-model/lr-tune/MHA/MHA_val_data_0.01.txt', '0.01'),
-                ('/Users/Ahan/Desktop/Ahan/UIUC/PL-FOR-NAS/attention/data/large-model/lr-tune/MHA/MHA_val_data_0.001.txt', '0.001'),
-                ('/Users/Ahan/Desktop/Ahan/UIUC/PL-FOR-NAS/attention/data/large-model/lr-tune/MHA/MHA_val_data_0.0001.txt', '0.0001'),
-                ('/Users/Ahan/Desktop/Ahan/UIUC/PL-FOR-NAS/attention/data/large-model/lr-tune/MHA/MHA_val_data_1e-05.txt', '1e-05'),
-                ('/Users/Ahan/Desktop/Ahan/UIUC/PL-FOR-NAS/attention/data/large-model/lr-tune/MHA/MHA_val_data_1e-06.txt', '1e-06'))
+plot_perplexity(('/Users/Ahan/Desktop/Ahan/UIUC/PL-FOR-NAS/attention/data/large-model/lr-tune/MHA/MHA_val_data_0.0001.txt', '4k warmup'),
+                ('/Users/Ahan/Desktop/Ahan/UIUC/PL-FOR-NAS/attention/data/large-model/lr-tune/MHA/MHA_val_data_0.0001_10000.txt', '10k warmup'),
+                ('/Users/Ahan/Desktop/Ahan/UIUC/PL-FOR-NAS/attention/data/large-model/lr-tune/MHA/MHA_val_data_0.0001_20000.txt', '20k warmup'),
+                ('/Users/Ahan/Desktop/Ahan/UIUC/PL-FOR-NAS/attention/data/large-model/lr-tune/MHA/MHA_val_data_0.0001_30000.txt', '30k warmup'))
 #plot_performance(('/Users/Ahan/Desktop/Ahan/UIUC/PL-FOR-NAS/attention/benchmark_results_LinMHA.txt', 'Linformer'),
 #                 ('/Users/Ahan/Desktop/Ahan/UIUC/PL-FOR-NAS/attention/benchmark_results_CompMHA.txt', 'Lin-Perf Transformer'))
 plt.show()

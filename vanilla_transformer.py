@@ -441,8 +441,6 @@ class Transformer(tf.keras.Model):
         )
 
     self.encoder_only = encoder_only
-    # The final linear layer.
-    self.final_layer = tf.keras.layers.Dense(target_vocab_size)
 
   def call(self, inputs, training):
     # Keras models prefer if you pass all your inputs in the first argument.
@@ -458,13 +456,6 @@ class Transformer(tf.keras.Model):
       # The decoder output.
       dec_output, attention_weights = self.decoder(
           tar, enc_output, enc_mask, training)  # `(batch_size, tar_seq_len, d_model)`
-      # The final linear layer output.
-      final_output = self.final_layer(dec_output)  # Shape `(batch_size, tar_seq_len, target_vocab_size)`.
-    else:
-      final_output = self.final_layer(enc_output) # Shape `(batch_size, tar_seq_len, target_vocab_size)`.
+      return dec_output, attention_weights
 
-    # Return the final output and the attention weights.
-    if not self.encoder_only:
-      return final_output, attention_weights
-    else:
-      return final_output, None ## TODO, figure out a better way to do this.
+    return enc_output, None ## TODO, figure out a better way to do this.
