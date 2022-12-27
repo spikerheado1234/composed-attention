@@ -32,12 +32,6 @@ def get_val_ds():
     )
     return ds
 
-## Next, we use the dataset to generate the vocabulary. ##
-print('generating vocabulary')
-#en_vocab = generate_vocabulary(get_all_ds(), lambda en_one: en_one)
-
-#write_vocab_file('en_vocab.txt', en_vocab)
-
 print('generating tokenizer')
 en_tokenizer = generate_tokenizer('en_vocab.txt', bert_tokenizer_params)
 
@@ -56,5 +50,12 @@ def make_batches(ds, BUFFER_SIZE, BATCH_SIZE):
       .map(prepare_batch, tf.data.AUTOTUNE)
       .prefetch(buffer_size=tf.data.AUTOTUNE))
 
+if __name__ == "__main__":
+    ## To re-generate the vocab file just run python pre_train_wiki_loader.py. ##
 
+    ## Next, we use the dataset to generate the vocabulary. ##
+    print('generating vocabulary')
 
+    en_vocab = generate_vocabulary(get_all_ds(), lambda en_one: en_one)
+
+    write_vocab_file('en_vocab.txt', en_vocab)

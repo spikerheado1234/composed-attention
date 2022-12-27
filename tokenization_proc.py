@@ -55,6 +55,8 @@ def write_vocab_file(filepath, vocab):
 
 ## TODO, comment this out after tokenization has been run. ##
 ## To not keep repeating this, comment out eventually. ##
+
+## I believe it is safe to delete this. ##
 #en_vocab = generate_vocabulary(train_examples, lambda en_one, en_two : en_one)
 
 #write_vocab_file('en_vocab.txt', en_vocab)
