@@ -13,6 +13,8 @@ import numpy as np
 from datasets import load_dataset
 from pre_train_wiki_loader import en_tokenizer
 
+import pdb ## ONLY FOR DEBUGGING, TODO REMOVE AFTER FINISHED USING.
+
 ## Define argument parsing and help over here. ##
 
 parser = argparse.ArgumentParser(description='Train compositions of efficient Transformer Variants.')
@@ -49,9 +51,9 @@ class C4Loader:
         try:
             while count < self.batch_size:
                 if count == 0:
-                    inp_tensor = tf.convert_to_tensor([[next(self.inp_iter)['text']]])
+                    inp_tensor = tf.convert_to_tensor([next(self.inp_iter)['text']])
                 else:
-                    current_input = tf.convert_to_tensor([[next(self.inp_iter)['text']]])
+                    current_input = tf.convert_to_tensor([next(self.inp_iter)['text']])
                     inp_tensor = tf.concat([inp_tensor, current_input], axis=0)
                     
                 count += 1
@@ -62,7 +64,7 @@ class C4Loader:
             self.has_more_data = False
             return inp_tensor
     
-    def has_more_data(self):
+    def is_data_rem(self):
         return self.has_more_data
 
     def reset_data(self):
@@ -147,7 +149,10 @@ def accuracy_function(real, pred, weights):
   accuracies = tf.cast(accuracies, dtype=tf.float32)
   mask = tf.cast(mask, dtype=tf.float32)
 
-  return tf.reduce_sum(accuracies) / tf.reduce_sum(mask)
+  ## Corner case, when nothing is masked (prob of 0.85^(Batch Size * Sequence Length)) then we will get NaNs propagated. ##
+  epsilon = 1e-9
+
+  return tf.reduce_sum(accuracies) / (tf.reduce_sum(mask) + epsilon)
 
 train_loss = tf.keras.metrics.Mean(name='train_loss')
 train_accuracy = tf.keras.metrics.Mean(name='train_accuracy')
@@ -218,8 +223,8 @@ for epoch in range(EPOCHS):
 
   train_loss.reset_states()
   train_accuracy.reset_states()
-  
-  while train_loader.has_more_data():
+
+  while train_loader.is_data_rem():
     if steps_elapsed > total_steps_required:
       break
     inp = train_loader.gen_next_train_data()
