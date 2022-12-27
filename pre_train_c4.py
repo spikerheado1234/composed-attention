@@ -13,8 +13,6 @@ import numpy as np
 from datasets import load_dataset
 from pre_train_wiki_loader import en_tokenizer
 
-import pdb ## ONLY FOR DEBUGGING, TODO REMOVE AFTER FINISHED USING.
-
 ## Define argument parsing and help over here. ##
 
 parser = argparse.ArgumentParser(description='Train compositions of efficient Transformer Variants.')
@@ -89,6 +87,7 @@ dff = 2048
 num_attention_heads = 8
 dropout_rate = 0.1
 rank = args.rank
+val_iter_freq = 10000
 
 transformer = Transformer(
     num_layers=num_layers,
@@ -157,6 +156,9 @@ def accuracy_function(real, pred, weights):
 train_loss = tf.keras.metrics.Mean(name='train_loss')
 train_accuracy = tf.keras.metrics.Mean(name='train_accuracy')
 
+val_loss = tf.keras.metrics.Mean(name='val_loss')
+val_accuracy = tf.keras.metrics.Mean(name='val_accuracy')
+
 checkpoint_path = './checkpoints/train/' + str(args.attention_type) + '/' + str(initial_learning_rate) + '/' + str(args.warmup)
 
 ckpt = tf.train.Checkpoint(step=tf.Variable(1),
@@ -208,6 +210,22 @@ def train_step(inputs):
   train_loss.update_state(loss, sample_weight=weight[:, 1:])
   train_accuracy(accuracy)
 
+def val_step(inputs):
+  global en_tokenizer
+
+  input_tok = en_tokenizer.tokenize(inputs)
+
+  (inp, tar_inp), tar_real, weight = mask_data(input_tok)
+
+  predictions, _ = transformer([inp, tar_inp],
+                                training = True)
+  loss = loss_object(tar_real, predictions, sample_weight=weight[:, 1:]) 
+
+  accuracy = accuracy_function(tar_real, predictions, weight[:, 1:])
+
+  val_loss.update_state(loss, sample_weight=weight[:, 1:])
+  val_accuracy(accuracy)
+
 EPOCHS = 30
 total_steps_required = args.num_steps
 
@@ -247,15 +265,30 @@ for epoch in range(EPOCHS):
 
     steps_elapsed += 1
 
+    ## Here, we validate the data.
+    if (steps_elapsed % val_iter_freq == 0 and steps_elapsed != 0):
+      val_loss.reset_states()
+      val_accuracy.reset_states()
+
+      while val_loader.has_more_data():
+        inp = val_loader.gen_next_train_data()
+        val_step(inp)
+
+      with open(f"./val_data_{args.attention_type}.txt", "a+") as f:
+        f.write(f'{val_loss.result():.4f} {val_accuracy.result():.4f}\n')
+
+      ## We reset the data.
+      val_loader.reset_data()
+
   if (epoch + 1) % 5 == 0:
     ckpt_save_path = ckpt_manager.save()
     print(f'Saving checkpoint for epoch {epoch+1} at {ckpt_save_path}', flush=True)
-
 
   print(f'Epoch {epoch + 1} Loss {train_loss.result():.4f} Accuracy {train_accuracy.result():.4f}', flush=True)
 
   print(f'Time taken for 1 epoch: {time.time() - start:.2f} secs\n', flush=True)
 
+  batch += 1
 
 train_end = time.time()
 
