@@ -88,7 +88,7 @@ num_attention_heads = 8
 dropout_rate = 0.1
 rank = args.rank
 val_iter_freq = 10000
-val_count = args.batch_size * 2000
+val_count = 2000
 
 transformer = Transformer(
     num_layers=num_layers,
@@ -267,12 +267,12 @@ for epoch in range(EPOCHS):
     steps_elapsed += 1
 
     ## Here, we validate the data.
-    if (steps_elapsed % val_iter_freq == 0 and steps_elapsed != 0):
+    if steps_elapsed % val_iter_freq == 0 and steps_elapsed != 0:
       val_loss.reset_states()
       val_accuracy.reset_states()
       val_step_count = 0
 
-      while val_loader.has_more_data() and val_step_count < val_count:
+      while val_loader.is_data_rem() and val_step_count < val_count:
         inp = val_loader.gen_next_train_data()
         val_step(inp)
         val_step_count += 1
