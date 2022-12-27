@@ -10,7 +10,7 @@ import tensorflow_datasets as tfds
 import argparse
 import time
 import numpy as np
-import pdb ## For debugging only, TODO remove.
+import pdb ## For debugging purposes only.
 
 from pre_train_wiki_loader import en_tokenizer
 from stats import Stats 
@@ -183,7 +183,7 @@ loss_object = tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True, re
 ## TODO, come back to this later. ## TODO, sanity check this.
 def accuracy_function(real, pred):
   ## We delete whatever corresponds to the [END] token over here. 
-  accuracies = tf.math.equal(tf.cast(real, dtype=tf.int64), tf.cast(tf.round(pred), dtype=tf.int64))
+  accuracies = tf.math.equal(tf.cast(real, dtype=tf.int64), tf.reshape(tf.math.argmax(pred, axis=1), [s for s in real.shape]))
   accuracies = tf.cast(accuracies, dtype=tf.float32)
   return tf.reduce_sum(accuracies) / tf.reduce_sum(tf.ones(shape=real.shape, dtype=tf.float32)) ## Divide by batch * seq to get accuracy over everything.
   
@@ -227,11 +227,11 @@ def pad_data(enc_inp, dec_inp, answer):
   ## First, we prepare the answer
   answer = dec_inp
 
-  answer_np = answer.numpy()
-  np.char.replace(answer_np, b'A ', b'1 ')
-  np.char.replace(answer_np, b'B ', b'2 ')
-  np.char.replace(answer_np, b'C ', b'3 ')
-  np.char.replace(answer_np, b'D ', b'4 ')
+  answer_np = answer.numpy().astype('S')
+  answer_np = np.char.replace(answer_np, b'A', b'1')
+  answer_np = np.char.replace(answer_np, b'B', b'2')
+  answer_np = np.char.replace(answer_np, b'C', b'3')
+  answer_np = np.char.replace(answer_np, b'D', b'4')
 
   ## We convert answer to ensure that when cross-entropy loss is computed, all is well.
   enc_tok = en_tokenizer.tokenize(enc_inp)
@@ -251,7 +251,7 @@ def pad_data(enc_inp, dec_inp, answer):
 
   dec_inp = dec_inp[:, :-1] ## remove the last token from the decoder output.
 
-  return enc_inp, dec_inp, answer ## Also remove the last token from tar_real.
+  return enc_inp, dec_inp, tf.convert_to_tensor(answer_np.astype('i')) ## Also remove the last token from tar_real.
 
 def train_step(enc_inp, dec_inp, answer):
 
@@ -286,7 +286,6 @@ for epoch in range(EPOCHS):
   train_accuracy.reset_states()
 
   ## We set a debugging statement over here. ##
-  pdb.set_trace()
   while raceLoader.has_more_train_data():
     if steps_elapsed > total_steps_required:
       break
