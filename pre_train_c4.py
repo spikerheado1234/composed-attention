@@ -13,6 +13,7 @@ import numpy as np
 from datasets import load_dataset
 from pre_train_wiki_loader import en_tokenizer
 
+
 ## Define argument parsing and help over here. ##
 
 parser = argparse.ArgumentParser(description='Train compositions of efficient Transformer Variants.')
@@ -66,7 +67,9 @@ class C4Loader:
         return self.has_more_data
 
     def reset_data(self):
-        self.inp_iter = next(self.inp_dict)
+
+        ## Refresh the data.
+        self.inp_iter = iter(self.inp_dict)
 
 curr_dir = os.getcwd() + "/"
 
@@ -139,7 +142,7 @@ class CustomSchedule(tf.keras.optimizers.schedules.LearningRateSchedule):
 
 learning_rate = CustomSchedule(d_model)
 # Lets use a new learning rate here.
-initial_learning_rate = 0.0001
+initial_learning_rate = 2e-5
 num_train_steps = args.num_steps
 warmup_steps = args.warmup
 linear_decay = tf.keras.optimizers.schedules.PolynomialDecay(
