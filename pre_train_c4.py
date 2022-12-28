@@ -69,6 +69,7 @@ class C4Loader:
     def reset_data(self):
 
         ## Refresh the data.
+        self.has_more_data = True
         self.inp_iter = iter(self.inp_dict)
 
 curr_dir = os.getcwd() + "/"
