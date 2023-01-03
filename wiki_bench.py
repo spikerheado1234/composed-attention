@@ -130,6 +130,27 @@ train_step_signature = [
     tf.TensorSpec(shape=(None, None), dtype=tf.int64),
 ]
 
+## Finally, our masked language model. ##
+class MaskedLM(tf.keras.Model):
+    def __init__(self, transformer, target_vocab_size, encoder_only):
+        super(MaskedLM, self).__init__()
+
+        self.transformer = transformer
+        self.encoder_only = encoder_only
+
+        # The final linear layer.
+        self.final_layer = tf.keras.layers.Dense(target_vocab_size)
+
+    def call(self, inp):
+      output, attention_weights = self.transformer(inp)
+
+      final_output = self.final_layer(output)  # Shape `(batch_size, tar_seq_len, target_vocab_size)`.
+
+      # Return the final output and the attention weights.
+      return final_output, attention_weights
+
+masked_lm = MaskedLM(transformer, Constants.wiki_vocab_size, True)
+
 def mask_data(inp_tok):
   global MAX_TOKENS 
   """
@@ -148,16 +169,18 @@ def train_step(inputs, labels):
 
   (inp, tar_inp), tar_real, weight = mask_data(inp)
 
+  train_step_start = time.time()
   with tf.GradientTape() as tape:
     if args.enc_only: ## We must then remove the end token from the input into the encoder.
       inp = tf.convert_to_tensor(inp.numpy()[:, :-1])
-    predictions, _ = transformer([inp, tar_inp],
-                                 training = True)
+    predictions, _ = masked_lm([inp, tar_inp], training = True)
     loss = loss_object(tar_real, predictions, sample_weight=weight[:, 1:]) 
     accuracy = accuracy_function(tar_real, predictions, weight[:, 1:])
 
   gradients = tape.gradient(loss, transformer.trainable_variables)
   optimizer.apply_gradients(zip(gradients, transformer.trainable_variables))
+  train_step_end = time.time()
+  Stats.train_step_time += train_step_end - train_step_start
 
   train_loss.update_state(loss, sample_weight=weight[:, 1:])
   train_accuracy(accuracy)
@@ -188,5 +211,5 @@ for epoch in range(EPOCHS):
 train_end = time.time()
 
 with open(f"benchmark_results_{args.attention_type}.txt", "a+") as f:
-    f.write(f"End-To-End Training time: {train_end-train_start}, sequence length: {args.sequence_length}, downsampling value: {args.downsampling_k}, hidden_dim: {d_model}\n")
+    f.write(f"Train Step Time: {Stats.train_step_time}, sequence length: {args.sequence_length}, downsampling value: {args.downsampling_k}, hidden_dim: {d_model}\n")
     f.write(f"MHA {Stats.mha_time:.4f} MHA-Enc {Stats.mha_enc_time:.4f} MHA-Causal {Stats.mha_causal_time:.4f} MHA-Enc-Dec {Stats.mha_enc_dec_time:.4f} FFN {Stats.ffn_time:.4f} Downsampling {Stats.downsampling_time:.4f} Kernel-Transformation {Stats.transformation_time:.4f}\n")

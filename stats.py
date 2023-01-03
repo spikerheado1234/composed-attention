@@ -10,6 +10,8 @@ class Stats:
     mha_enc_dec_time = 0 # Total time spent in enc-dec attention in the Decoder.
     ffn_time = 0 # Time spent in feed forward network.
 
+    train_step_time = 0 ## Time spent only in the Train Step.
+
     ## For LinFormer. ##
     downsampling_time = 0 # Time spent down_sampling the matrix.
 
