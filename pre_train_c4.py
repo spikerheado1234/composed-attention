@@ -303,7 +303,7 @@ for epoch in range(EPOCHS):
         val_step(inp)
         val_step_count += 1
 
-      with open(f'./val_data_{args.attention_type}.txt', "a+") as f:
+      with open(f'./{args.attention_type}_val_data.txt', "a+") as f:
         f.write(f'{val_loss.result():.4f} {val_accuracy.result():.4f}\n')
 
       ## We reset the data.

@@ -81,7 +81,9 @@ def prepare_cola(inp):
     return inp_tok.merge_dims(-2, -1).to_tensor(), tf.reshape(label, shape=(label.shape[0], 1)) ## Tuple of (Tokenized input, answer)
 
 def cola_accuracy(real, pred):
-    pass
+    accuracies = tf.math.equal(tf.cast(pred, dtype=tf.int64), real)
+    accuracies = tf.cast(accuracies, dtype=tf.float32)
+    return tf.reduce_sum(accuracies) / tf.sum(tf.ones(shape=real.shape, dtype=tf.float32))
 
 if args.task == "cola":
     train_data = tfds.load(name="glue/cola", split="train").map(prepare_cola)
@@ -215,6 +217,7 @@ for epoch in range(EPOCHS):
   train_loss.reset_states()
   train_accuracy.reset_states()
 
+  pdb.set_trace()
   for (batch, (enc_part, dec_part)) in enumerate(train_data):
     train_step(enc_part, dec_part)
 
