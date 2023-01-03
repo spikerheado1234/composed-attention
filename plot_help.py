@@ -105,7 +105,7 @@ def plot_performance(*args):
     plt.ylabel('Time (s)')    
 
 ## We set the max and min y-axis values.
-plt.ylim(0, 250)
+plt.ylim(0, 150)
 
 #plot_loss(('/Users/Ahan/Desktop/Ahan/UIUC/PL-FOR-NAS/attention/data/vt_512s_8bs_train_data.txt', 'Vanilla Transformer'),
 #           ('/Users/Ahan/Desktop/Ahan/UIUC/PL-FOR-NAS/attention/data/pt_512s_8bs_train_data.txt', 'Performer-VT Semi-Composed'))
