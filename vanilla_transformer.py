@@ -340,7 +340,7 @@ class DecoderLayer(tf.keras.layers.Layer):
     ffn_start = time.time()
     ffn_output = self.ffn(out2)  # Shape `(batch_size, target_seq_len, d_model)`.
     ffn_end = time.time()
-    Stats.mha_time += (ffn_end - ffn_start)
+    Stats.ffn_time += (ffn_end - ffn_start)
     ffn_output = self.dropout1(ffn_output, training=training)
     out3 = self.layernorm3(ffn_output + out2)  # Shape `(batch_size, target_seq_len, d_model)`.
 
