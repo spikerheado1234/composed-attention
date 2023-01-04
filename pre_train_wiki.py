@@ -24,6 +24,7 @@ parser.add_argument('--step_count', dest='num_steps', type=int, default=500000, 
 parser.add_argument('--rank', dest='rank', type=int, default=1, help='The rank of the process, to distinguish output.')
 parser.add_argument('--encoder_only', dest='enc_only', action='store_true', help='Whether we are training in encoder only mode')
 parser.add_argument('--warmup', dest='warmup', default=10000, type=int, help='The number of warmup steps required during pre-training.')
+parser.add_argument('--learning_rate', dest='lr_rate', type=float, default=0.0001, help='the largest constant in the lr schedule.')
 
 args = parser.parse_args()
 
@@ -82,7 +83,7 @@ class CustomSchedule(tf.keras.optimizers.schedules.LearningRateSchedule):
 
 learning_rate = CustomSchedule(d_model)
 # Lets use a new learning rate here.
-initial_learning_rate = 0.0001
+initial_learning_rate = args.lr_rate
 num_train_steps = args.num_steps
 warmup_steps = args.warmup
 linear_decay = tf.keras.optimizers.schedules.PolynomialDecay(
