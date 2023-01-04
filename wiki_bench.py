@@ -187,7 +187,7 @@ def train_step(inputs, labels):
   train_perplexity(perplexity_function(train_loss.result()))
 
 EPOCHS = 30
-total_steps_required = 100
+total_steps_required = 1000
 
 steps_elapsed = 0
 
