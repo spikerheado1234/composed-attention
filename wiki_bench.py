@@ -177,8 +177,15 @@ def train_step(inputs, labels):
     loss = loss_object(tar_real, predictions, sample_weight=weight[:, 1:]) 
     accuracy = accuracy_function(tar_real, predictions, weight[:, 1:])
 
+  gradient_start = time.time()
   gradients = tape.gradient(loss, transformer.trainable_variables)
+  gradient_end = time.time()
+  Stats.gradient_computation += (gradient_end - gradient_start)
+
+  optimiser_start = time.time()
   optimizer.apply_gradients(zip(gradients, transformer.trainable_variables))
+  optimiser_end = time.time()
+  Stats.optimser_step += (optimiser_end - optimiser_start)
   train_step_end = time.time()
   Stats.train_step_time += train_step_end - train_step_start
 
@@ -212,4 +219,4 @@ train_end = time.time()
 
 with open(f"benchmark_results_{args.attention_type}.txt", "a+") as f:
     f.write(f"Train Step Time: {Stats.train_step_time}, sequence length: {args.sequence_length}, downsampling value: {args.downsampling_k}, hidden_dim: {d_model}\n")
-    f.write(f"MHA {Stats.mha_time:.4f} MHA-Enc {Stats.mha_enc_time:.4f} MHA-Causal {Stats.mha_causal_time:.4f} MHA-Enc-Dec {Stats.mha_enc_dec_time:.4f} FFN {Stats.ffn_time:.4f} Downsampling {Stats.downsampling_time:.4f} Kernel-Transformation {Stats.transformation_time:.4f}\n")
+    f.write(f"MHA {Stats.mha_time:.4f} MHA-Enc {Stats.mha_enc_time:.4f} MHA-Causal {Stats.mha_causal_time:.4f} MHA-Enc-Dec {Stats.mha_enc_dec_time:.4f} FFN {Stats.ffn_time:.4f} Downsampling {Stats.downsampling_time:.4f} Kernel-Transformation {Stats.transformation_time:.4f} Gradient Computation: {Stats.gradient_computation} Optimisation Step: {Stats.optimser_step}\n")

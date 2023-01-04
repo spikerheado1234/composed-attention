@@ -12,6 +12,10 @@ class Stats:
 
     train_step_time = 0 ## Time spent only in the Train Step.
 
+    gradient_computation = 0 ## Time spent in computing gradients.
+
+    optimser_step = 0 ## Time spent in the optimisation step.
+
     ## For LinFormer. ##
     downsampling_time = 0 # Time spent down_sampling the matrix.
 
