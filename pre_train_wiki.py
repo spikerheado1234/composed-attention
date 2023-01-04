@@ -142,6 +142,26 @@ if ckpt_manager.latest_checkpoint:
   ckpt.restore(ckpt_manager.latest_checkpoint)
   print('Latest checkpoint restored!!')
 
+class MaskedLM(tf.keras.Model):
+    def __init__(self, transformer, target_vocab_size, encoder_only):
+        super(MaskedLM, self).__init__()
+
+        self.transformer = transformer
+        self.encoder_only = encoder_only
+
+        # The final linear layer.
+        self.final_layer = tf.keras.layers.Dense(target_vocab_size)
+
+    def call(self, inp):
+      output, attention_weights = self.transformer(inp)
+
+      final_output = self.final_layer(output)  # Shape `(batch_size, tar_seq_len, target_vocab_size)`.
+
+      # Return the final output and the attention weights.
+      return final_output, attention_weights
+
+masked_lm = MaskedLM(transformer, Constants.wiki_vocab_size, False)
+
 train_step_signature = [
     (
          tf.TensorSpec(shape=(None, None), dtype=tf.int64),
@@ -187,7 +207,7 @@ def train_step(inputs, labels):
   compute_distribution(tar_real)
 
   with tf.GradientTape() as tape:
-    predictions, _ = transformer([inp, tar_inp],
+    predictions, _ = masked_lm([inp, tar_inp],
                                  training = True)
     loss = loss_object(tar_real, predictions, sample_weight=weight[:, 1:]) 
     accuracy = accuracy_function(tar_real, predictions, weight[:, 1:])
