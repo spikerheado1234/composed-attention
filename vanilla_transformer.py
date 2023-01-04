@@ -161,7 +161,10 @@ class Encoder(tf.keras.layers.Layer):
     self.num_layers = num_layers
 
     # Embeddings + Positional encoding
+    embedding_start = time.time()
     self.pos_embedding = PositionalEmbedding(input_vocab_size, d_model, length=sequence_length)
+    embedding_end = time.time()
+    Stats.embedding_time += (embedding_end - embedding_start)
 
     # Encoder layers.
     self.enc_layers = [

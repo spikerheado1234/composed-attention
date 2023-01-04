@@ -9,6 +9,7 @@ class Stats:
     mha_causal_time = 0 # Total time spent in Masked Multi-Head Self Attention in the Decoder.
     mha_enc_dec_time = 0 # Total time spent in enc-dec attention in the Decoder.
     ffn_time = 0 # Time spent in feed forward network.
+    embedding_time = 0 # Time spent in the positional embedding layer.
 
     train_step_time = 0 ## Time spent only in the Train Step.
 
