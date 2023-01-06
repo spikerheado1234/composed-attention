@@ -66,7 +66,7 @@ def prepare_transformer_input(enc_part, dec_part):
     
     dec_part = add_start_end(dec_part)
     real_dec_part = dec_part[:, :-1]
-    output_comparison = dec_part[:, 1:]
+    output_comparison = dec_part[:, 1:-1]
     
     return enc_part, real_dec_part, output_comparison
 
@@ -81,13 +81,13 @@ def prepare_cola(inp):
     return inp_tok.merge_dims(-2, -1).to_tensor(), tf.reshape(label, shape=(label.shape[0], 1)) ## Tuple of (Tokenized input, answer)
 
 def cola_accuracy(real, pred):
-    accuracies = tf.math.equal(tf.cast(pred, dtype=tf.int64), real)
+    accuracies = tf.math.equal(tf.cast(tf.math.round(pred), dtype=tf.int64), real)
     accuracies = tf.cast(accuracies, dtype=tf.float32)
-    return tf.reduce_sum(accuracies) / tf.sum(tf.ones(shape=real.shape, dtype=tf.float32))
+    return tf.reduce_sum(accuracies) / tf.reduce_sum(tf.ones(shape=real.shape, dtype=tf.float32))
 
 if args.task == "cola":
-    train_data = tfds.load(name="glue/cola", split="train").map(prepare_cola)
-    val_data = tfds.load(name="glue/cola", split="validation").map(prepare_cola)
+    train_data = tfds.load(name="glue/cola", split="train").batch(args.batch_size)
+    val_data = tfds.load(name="glue/cola", split="validation").batch(args.batch_size)
     prepare_helper = prepare_cola 
     loss_object = tf.keras.losses.BinaryCrossentropy(from_logits=False, reduction='none')
     accuracy_function = cola_accuracy
@@ -120,7 +120,7 @@ transformer = Transformer(
     encoder_only=args.enc_only)
 
 ## Then, we create the learning rate schedule. ##
-initial_learning_rate = 0.0001
+initial_learning_rate = 0.0002
 num_train_steps = args.num_steps
 warmup_steps = args.warmup
 linear_decay = tf.keras.optimizers.schedules.PolynomialDecay(
@@ -152,11 +152,12 @@ if ckpt_manager.latest_checkpoint:
   print('Latest checkpoint restored!!')
 else:
     ## Otherwise we raise an exception. We should ALWAYS load from a checkpoint over here. ##
-    raise Exception
+    raise Exception("Did not find any suitable model checkpoint to load from.")
 
 
 class DownstreamModel(tf.keras.Model):
     def __init__(self, transformer, glue_task):
+        super(DownstreamModel, self).__init__()
         self.glue_task = glue_task
         self.transformer = transformer
 
@@ -188,8 +189,9 @@ def val_step(enc_part, dec_part):
   train_loss.update_state(loss)
   train_accuracy(accuracy)
 
-def train_step(enc_part, dec_part):
-
+def train_step(inp):
+  
+  enc_part, dec_part = prepare_helper(inp)
   enc_part, dec_part, real_val = prepare_transformer_input(enc_part, dec_part)
 
   with tf.GradientTape() as tape:
@@ -218,8 +220,8 @@ for epoch in range(EPOCHS):
   train_accuracy.reset_states()
 
   pdb.set_trace()
-  for (batch, (enc_part, dec_part)) in enumerate(train_data):
-    train_step(enc_part, dec_part)
+  for batch, inp in enumerate(train_data):
+    train_step(inp)
 
   train_loss.reset_states()
   train_accuracy.reset_states()
