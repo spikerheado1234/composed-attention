@@ -67,6 +67,26 @@ transformer = Transformer(
     sequence_length=args.sequence_length,
     encoder_only=args.enc_only)
 
+class MaskedLM(tf.keras.Model):
+    def __init__(self, transformer, target_vocab_size, encoder_only):
+        super(MaskedLM, self).__init__()
+
+        self.transformer = transformer
+        self.encoder_only = encoder_only
+
+        # The final linear layer.
+        self.final_layer = tf.keras.layers.Dense(target_vocab_size)
+
+    def call(self, inp):
+      output, attention_weights = self.transformer(inp)
+
+      final_output = self.final_layer(output)  # Shape `(batch_size, tar_seq_len, target_vocab_size)`.
+
+      # Return the final output and the attention weights.
+      return final_output, attention_weights
+
+masked_lm = MaskedLM(transformer, Constants.wiki_vocab_size, False)
+
 # Lets use a new learning rate here.
 initial_learning_rate = 2e-5
 num_train_steps = args.num_steps
@@ -152,7 +172,7 @@ def train_step(inputs, labels):
 
   (inp, tar_inp), tar_real, weight = mask_data(inp)
 
-  predictions, _ = transformer([inp, tar_inp],
+  predictions, _ = masked_lm([inp, tar_inp],
                                  training = True)
   loss = loss_object(tar_real, predictions, sample_weight=weight[:, 1:]) 
   accuracy = accuracy_function(tar_real, predictions, weight[:, 1:])
