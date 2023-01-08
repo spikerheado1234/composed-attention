@@ -60,6 +60,8 @@ accuracy_function = None
 ## 3.) Producing the real output. Which is the "ground truth" we will compare to for teacher forcing.
 def prepare_transformer_input(enc_part, dec_part):
     global MAX_TOKENS
+
+    pdb.set_trace()
     enc_part = enc_part[:, :MAX_TOKENS]
     enc_part = pad(enc_part, MAX_TOKENS)
     enc_part = enc_part[:, :-2]
@@ -72,7 +74,7 @@ def prepare_transformer_input(enc_part, dec_part):
     output_comparison = dec_part[:, 1:]
     ones = np.ones(shape=(output_comparison.shape))
     zeros = np.zeros(shape=(output_comparison.shape))
-    weights = tf.convert_to_tensor(np.where(output_comparison.numpy() > 5, ones, zeros))
+    weights = tf.cast(tf.convert_to_tensor(np.where(output_comparison.numpy() > 5, ones, zeros)), dtype=tf.int64)
     
     return enc_part, real_dec_part, output_comparison, weights
 
@@ -90,11 +92,11 @@ def prepare_cola(inp):
     prefix = tf.convert_to_tensor(['cola sentence: '])
     sentence = prefix + inp['sentence']
     label = inp['label']
-    label = en_tokenizer.tokenize(label)
+    label = en_tokenizer.tokenize(tf.convert_to_tensor(label.numpy().astype('S')))
         
     inp_tok = en_tokenizer.tokenize(sentence)
 
-    return inp_tok.merge_dims(-2, -1).to_tensor(), label ## Tuple of (Tokenized input, answer)
+    return inp_tok.merge_dims(-2, -1).to_tensor(), label.merge_dims(-2, -1).to_tensor() ## Tuple of (Tokenized input, answer)
 
 def cola_accuracy(real, pred):
     accuracies = tf.math.equal(tf.cast(tf.math.round(pred), dtype=tf.int64), real)
@@ -434,7 +436,7 @@ class DownstreamModel(tf.keras.Model):
         output, _ = self.transformer(input)
         return self.layer_out(output)
 
-downstream_model = DownstreamModel(transformer, args.task)
+downstream_model = DownstreamModel(transformer, args.task, Constants.wiki_vocab_size)
 
 def val_step(inp):
 
@@ -480,6 +482,7 @@ for epoch in range(EPOCHS):
   train_loss.reset_states()
   train_accuracy.reset_states()
 
+  #pdb.set_trace()
   for batch, inp in enumerate(train_data):
     train_step(inp)
 
