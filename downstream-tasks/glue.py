@@ -428,11 +428,19 @@ class DownstreamModel(tf.keras.Model):
         self.glue_task = glue_task
         self.transformer = transformer
 
-        self.layer_out = tf.keras.layers.Dense(target_vocab_size) ## Again, another hyperparameter to be tuned.
+        if args.task == "cola":
+            self.layer_expand = tf.keras.layers.Dense(64, activation=tf.keras.activations.relu)
+            self.layer_out = tf.keras.layers.Dense(1, activation=tf.keras.activations.sigmoid)
+        else:
+            self.layer_out = tf.keras.layers.Dense(target_vocab_size) ## Again, another hyperparameter to be tuned.
 
     def call(self, input):
         output, _ = self.transformer(input)
-        return self.layer_out(output)
+        if args.task == "cola":
+            output = self.layer_expand(output)
+            return self.layer_out(output)
+        else:
+            return self.layer_out(output)
 
 downstream_model = DownstreamModel(transformer, args.task)
 
