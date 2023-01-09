@@ -9,7 +9,6 @@ import os
 import tensorflow_datasets as tfds
 import argparse
 import time
-import pdb ## For debugging only, TODO remove.
 import numpy as np
 
 from pre_train_wiki_loader import en_tokenizer
@@ -30,6 +29,7 @@ parser.add_argument('--rank', dest='rank', type=int, default=1, help='The rank o
 parser.add_argument('--encoder_only', dest='enc_only', action='store_true', help='Whether we are training in encoder only mode')
 parser.add_argument('--warmup', dest='warmup', default=10000, type=int, help='The number of warmup steps required during pre-training.')
 parser.add_argument('--task', dest='task', default="cola", type=str, help='The GLUE task to fine-tune on.')
+parser.add_argument('--learning_rate', dest='lr_rate', type=float, default=0.0002, help='the largest constant in the lr schedule.')
 
 args = parser.parse_args()
 
@@ -61,15 +61,17 @@ accuracy_function = None
 def prepare_transformer_input(enc_part, dec_part):
     global MAX_TOKENS
 
-    pdb.set_trace()
     enc_part = enc_part[:, :MAX_TOKENS]
     enc_part = pad(enc_part, MAX_TOKENS)
     enc_part = enc_part[:, :-2]
     enc_part = add_start_end(enc_part)
+    ## May have to add additional padding just so that it doesn't complain for Linformer type architectures due to poor state capturing whilst checkpointing.
+
+    ## This is the part that is added, may impact accuracy deliteriously.##
+    dec_part = pad(dec_part, MAX_TOKENS)
+    dec_part = dec_part[:, :-2]
     
     dec_part = add_start_end(dec_part)
-    ## May have to add additional padding just so that it doesn't complain for Linformer type architectures due to poor state capturing whilst checkpointing.
-    ## dec_part = pad(dec_part, MAX_TOKENS)
     real_dec_part = dec_part[:, :-1]
     output_comparison = dec_part[:, 1:]
     ones = np.ones(shape=(output_comparison.shape))
@@ -79,11 +81,21 @@ def prepare_transformer_input(enc_part, dec_part):
     return enc_part, real_dec_part, output_comparison, weights
 
 def compute_accuracy(real, pred, weights):
-    accuracies = tf.math.equal(real, pred)
-    mask = tf.math.equal(weights, tf.ones(shape=weights.shape))
-    accuracies &= mask
-    accuracies = tf.cast(accuracies, dtype=tf.float32)
-    return tf.reduce_sum(accuracies) / tf.reduce_sum(tf.cast(weights, dtype=tf.float32))
+    if args.task == "cola" or args.task == "sst2" or args.task == "mrpc" or args.task == "qqp" or args.task == "mnli" or args.task == "qnli" or args.task == "rte" or args.task == "wnli":
+        accuracies = tf.math.equal(real, tf.math.argmax(pred, axis=-1))
+        mask = tf.math.equal(weights, tf.ones(shape=weights.shape, dtype=tf.int64))
+        accuracies &= mask
+        accuracies = tf.cast(accuracies, dtype=tf.float32)
+        return tf.reduce_sum(accuracies) / tf.reduce_sum(tf.cast(weights, dtype=tf.float32))
+    elif args.task == "stsb":
+        accuracies = tf.math.equal(real, tf.math.argmax(pred, axis=-1))
+        mask = tf.math.equal(weights, tf.ones(shape=weights.shape, dtype=tf.int64))
+        accuracies &= mask
+        accuracies = tf.cast(accuracies, dtype=tf.float32)
+        ## Over here, for stsb we have a floating of the x.y. 
+        row_sum = tf.cast(tf.reduce_sum(accuracies, axis=-1), dtype=tf.int32)
+        cnts = tf.math.bincount(row_sum)
+        return tf.cast(cnts[3] if cnts.shape[0] >= 3 else tf.convert_to_tensor(0), dtype=tf.float32) / tf.convert_to_tensor(pred.shape[0], dtype=tf.float32)
 
 ## COLA HELPER METHODS. ##
 def prepare_cola(inp):
@@ -98,11 +110,6 @@ def prepare_cola(inp):
 
     return inp_tok.merge_dims(-2, -1).to_tensor(), label.merge_dims(-2, -1).to_tensor() ## Tuple of (Tokenized input, answer)
 
-def cola_accuracy(real, pred):
-    accuracies = tf.math.equal(tf.cast(tf.math.round(pred), dtype=tf.int64), real)
-    accuracies = tf.cast(accuracies, dtype=tf.float32)
-    return tf.reduce_sum(accuracies) / tf.reduce_sum(tf.ones(shape=real.shape, dtype=tf.float32))
-
 ## SST-2 HELPER METHODS. ##
 def prepare_sst2(inp):
     global en_tokenizer, MAX_TOKENS
@@ -110,14 +117,10 @@ def prepare_sst2(inp):
     prefix = tf.convert_to_tensor(["sst2 sentence: "])
     sentence = prefix + inp['sentence']
     label = inp['label']
+    label = en_tokenizer.tokenize(tf.convert_to_tensor(label.numpy().astype('S')))
         
     inp_tok = en_tokenizer.tokenize(sentence)
-    inp_tok.merge_dims(-2, -1).to_tensor(), tf.reshape(label, shape=(label.shape[0], 1)) 
-
-def sst2_accuracy(real, pred):
-    accuracies = tf.math.equal(tf.cast(tf.math.round(pred), dtype=tf.int64), real)
-    accuracies = tf.cast(accuracies, dtype=tf.float32)
-    return tf.reduce_sum(accuracies) / tf.reduce_sum(tf.ones(shape=real.shape, dtype=tf.float32))
+    return inp_tok.merge_dims(-2, -1).to_tensor(), label.merge_dims(-2, -1).to_tensor()
 
 ## MRPC HELPER METHODS ##
 def prepare_mrpc(inp):
@@ -133,17 +136,9 @@ def prepare_mrpc(inp):
     sentence_two = prefix_two + sentence_two
     enc_input = tf.convert_to_tensor(sentence_one.numpy() + sentence_two.numpy())
     enc_input = en_tokenizer.tokenize(enc_input)
-    true = np.array(['equivalent' for _ in range(label.shape[0])])
-    false = np.array(['different' for _ in range(label.shape[0])])
-    label = tf.convert_to_tensor(np.where(label.numpy() == 1, true, false))
-    label = en_tokenizer.tokenize(label)
+    label = en_tokenizer.tokenize(tf.convert_to_tensor(label.numpy().astype('S')))
     
     return enc_input.merge_dims(-2, -1).to_tensor(), label.merge_dims(-2, -1).to_tensor()
-
-def mrpc_accuracy(real, pred):
-    accuracies = tf.math.equal(tf.cast(tf.math.round(pred), dtype=tf.int64), real)
-    accuracies = tf.cast(accuracies, dtype=tf.float32)
-    return tf.reduce_sum(accuracies) / tf.reduce_sum(tf.ones(shape=real.shape, dtype=tf.float32))
 
 ## QQP HELPER METHODS. ##
 def prepare_qqp(inp):
@@ -159,17 +154,10 @@ def prepare_qqp(inp):
     sentence_two = prefix_two + sentence_two
     enc_input = tf.convert_to_tensor(sentence_one.numpy() + sentence_two.numpy())
     enc_input = en_tokenizer.tokenize(enc_input)
-    true = np.array(['duplicate' for _ in range(label.shape[0])])
-    false = np.array(['not_duplicate' for _ in range(label.shape[0])])
-    label = tf.convert_to_tensor(np.where(label.numpy() == 1, true, false))
-    label = en_tokenizer.tokenize(label)
+    label = en_tokenizer.tokenize(tf.convert_to_tensor(label.numpy().astype('S')))
     
     return enc_input.merge_dims(-2, -1).to_tensor(), label.merge_dims(-2, -1).to_tensor()
 
-def qqp_accuracy(real, pred):
-    accuracies = tf.math.equal(tf.cast(tf.math.round(pred), dtype=tf.int64), real)
-    accuracies = tf.cast(accuracies, dtype=tf.float32)
-    return tf.reduce_sum(accuracies) / tf.reduce_sum(tf.ones(shape=real.shape, dtype=tf.float32))
 
 ## STSB HELPER METHODS. ##
 def prepare_stsb(inp):
@@ -191,11 +179,6 @@ def prepare_stsb(inp):
     
     return enc_input.merge_dims(-2, -1).to_tensor(), label.merge_dims(-2, -1).to_tensor()
 
-def stsb_accuracy(real, pred):
-    accuracies = tf.math.equal(tf.cast(tf.math.round(pred), dtype=tf.int64), real)
-    accuracies = tf.cast(accuracies, dtype=tf.float32)
-    return tf.reduce_sum(accuracies) / tf.reduce_sum(tf.ones(shape=real.shape, dtype=tf.float32))
-
 ## MNLI Helper methods. ##
 def prepare_mnli(inp):
     global en_tokenizer
@@ -210,25 +193,9 @@ def prepare_mnli(inp):
     sentence_two = prefix_two + premise
     enc_input = tf.convert_to_tensor(sentence_one.numpy() + sentence_two.numpy())
     enc_input = en_tokenizer.tokenize(enc_input)
-    new_label = []
-    for val in label.numpy():
-        if val == 0:
-            new_label.append("entailment")
-        elif val == 1:
-            new_label.append("neutral")
-        elif val == 2:
-            new_label.append("contradiction")
-        else:
-            raise Exception("Incorrect MNLI label encountered!")
-    label = tf.convert_to_tensor(new_label)
-    label = en_tokenizer.tokenize(label)
+    label = en_tokenizer.tokenize(label.numpy().astype('S'))
     
     return enc_input.merge_dims(-2, -1).to_tensor(), label.merge_dims(-2, -1).to_tensor()
-
-def mnli_accuracy(real, pred):
-    accuracies = tf.math.equal(tf.cast(tf.math.round(pred), dtype=tf.int64), real)
-    accuracies = tf.cast(accuracies, dtype=tf.float32)
-    return tf.reduce_sum(accuracies) / tf.reduce_sum(tf.ones(shape=real.shape, dtype=tf.float32))
 
 ## QNLI helper methods. ##
 def prepare_qnli(inp):
@@ -244,17 +211,9 @@ def prepare_qnli(inp):
     sentence_two = prefix_two + sentence
     enc_input = tf.convert_to_tensor(sentence_one.numpy() + sentence_two.numpy())
     enc_input = en_tokenizer.tokenize(enc_input)
-    zero = np.array(['entailment' for _ in range(label.shape[0])])
-    one = np.array(['not_entailment' for _ in range(label.shape[0])])
-    label = tf.convert_to_tensor(np.where(label.numpy() == 1, one, zero))
-    label = en_tokenizer.tokenize(label)
+    label = en_tokenizer.tokenize(label.numpy().astype('S'))
     
     return enc_input.merge_dims(-2, -1).to_tensor(), label.merge_dims(-2, -1).to_tensor()
-
-def qnli_accuracy(real, pred):
-    accuracies = tf.math.equal(tf.cast(tf.math.round(pred), dtype=tf.int64), real)
-    accuracies = tf.cast(accuracies, dtype=tf.float32)
-    return tf.reduce_sum(accuracies) / tf.reduce_sum(tf.ones(shape=real.shape, dtype=tf.float32))
 
 ## RTE helper methods. ##
 def prepare_rte(inp):
@@ -270,17 +229,9 @@ def prepare_rte(inp):
     sentence_two = prefix_two + sentence_two
     enc_input = tf.convert_to_tensor(sentence_one.numpy() + sentence_two.numpy())
     enc_input = en_tokenizer.tokenize(enc_input)
-    zero = np.array(['entaliment' for _ in range(label.shape[0])])
-    one = np.array(['not_entailment' for _ in range(label.shape[0])])
-    label = tf.convert_to_tensor(np.where(label.numpy() == 1, one, zero))
-    label = en_tokenizer.tokenize(label)
+    label = en_tokenizer.tokenize(label.numpy().astype('S'))
     
     return enc_input.merge_dims(-2, -1).to_tensor(), label.merge_dims(-2, -1).to_tensor()
-
-def rte_accuracy(real, pred):
-    accuracies = tf.math.equal(tf.cast(tf.math.round(pred), dtype=tf.int64), real)
-    accuracies = tf.cast(accuracies, dtype=tf.float32)
-    return tf.reduce_sum(accuracies) / tf.reduce_sum(tf.ones(shape=real.shape, dtype=tf.float32))
 
 ## WNLI Helper methods. ##
 def prepare_wnli(inp):
@@ -296,48 +247,35 @@ def prepare_wnli(inp):
     sentence_two = prefix_two + sentence_two
     enc_input = tf.convert_to_tensor(sentence_one.numpy() + sentence_two.numpy())
     enc_input = en_tokenizer.tokenize(enc_input)
-    zero = np.array(['entaliment' for _ in range(label.shape[0])])
-    one = np.array(['not_entailment' for _ in range(label.shape[0])])
-    label = tf.convert_to_tensor(np.where(label.numpy() == 1, one, zero))
-    label = en_tokenizer.tokenize(label)
+    label = en_tokenizer.tokenize(label.numpy().astype('S'))
     
     return enc_input.merge_dims(-2, -1).to_tensor(), label.merge_dims(-2, -1).to_tensor()
-
-def wnli_accuracy(real, pred):
-    accuracies = tf.math.equal(tf.cast(tf.math.round(pred), dtype=tf.int64), real)
-    accuracies = tf.cast(accuracies, dtype=tf.float32)
-    return tf.reduce_sum(accuracies) / tf.reduce_sum(tf.ones(shape=real.shape, dtype=tf.float32))
 
 if args.task == "cola":
     train_data = tfds.load(name="glue/cola", split="train").batch(args.batch_size)
     val_data = tfds.load(name="glue/cola", split="validation").batch(args.batch_size)
     prepare_helper = prepare_cola 
-    loss_object = tf.keras.losses.BinaryCrossentropy(from_logits=False, reduction='none')
-    accuracy_function = cola_accuracy
+    loss_object = tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True, reduction='none')
 elif args.task == "sst2":
     train_data = tfds.load(name="glue/sst2", split="train").batch(args.batch_size)
     val_data = tfds.load(name="glue/sst2", split="validation").batch(args.batch_size)
     prepare_helper = prepare_sst2
-    loss_object = tf.keras.losses.BinaryCrossentropy(from_logits=False, reduction='none')
-    accuracy_function = sst2_accuracy
+    loss_object = tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True, reduction='none')
 elif args.task == "mrpc":
     train_data = tfds.load(name='glue/mrpc', split='train').batch(args.batch_size)
     val_data = tfds.load(name='glue/mrpc', split='validation').batch(args.batch_size)
     prepare_helper = prepare_mrpc
-    loss_object = tf.keras.losses.BinaryCrossentropy(from_logits=False, reduction='none')
-    accuracy_function = mrpc_accuracy 
+    loss_object = tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True, reduction='none')
 elif args.task == "qqp":
     train_data = tfds.load(name='glue/qqp', split='train').batch(args.batch_size)
     val_data = tfds.load(name='glue/qqp', split='validation').batch(args.batch_size)
     prepare_helper = prepare_qqp
-    loss_object = tf.keras.losses.BinaryCrossentropy(from_logits=False, reduction='none')
-    accuracy_function = qqp_accuracy 
+    loss_object = tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True, reduction='none')
 elif args.task == "stsb":
     train_data = tfds.load(name='glue/stsb', split='train').batch(args.batch_size)
     val_data = tfds.load(name='glue/stsb', split='validation').batch(args.batch_size)
     prepare_helper = prepare_stsb
-    loss_object = tf.keras.losses.BinaryCrossentropy(from_logits=False, reduction='none')
-    accuracy_function = stsb_accuracy 
+    loss_object = tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True, reduction='none')
 elif args.task == "mnli":
     train_data = tfds.load(name='glue/mnli', split='train').batch(args.batch_size)
     val_data_mismatched = tfds.load(name='glue/mnli', split='validation_mismatched').batch(args.batch_size)
@@ -345,26 +283,22 @@ elif args.task == "mnli":
     ## TODO, check if concatenation is correct. ##
     val_data = val_data_mismatched.concatenate(val_data_matched)
     prepare_helper = prepare_mnli
-    loss_object = tf.keras.losses.BinaryCrossentropy(from_logits=False, reduction='none')
-    accuracy_function = mnli_accuracy
+    loss_object = tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True, reduction='none')
 elif args.task == "qnli":
     train_data = tfds.load(name='glue/qnli', split='train').batch(args.batch_size)
     val_data = tfds.load(name='glue/qnli', split='validation').batch(args.batch_size)
     prepare_helper = prepare_qnli 
-    loss_object = tf.keras.losses.BinaryCrossentropy(from_logits=False, reduction='none')
-    accuracy_function = qnli_accuracy 
+    loss_object = tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True, reduction='none')
 elif args.task == "rte":
     train_data = tfds.load(name='glue/rte', split='train').batch(args.batch_size)
     val_data = tfds.load(name='glue/rte', split='validation').batch(args.batch_size)
     prepare_helper = prepare_rte 
-    loss_object = tf.keras.losses.BinaryCrossentropy(from_logits=False, reduction='none')
-    accuracy_function = rte_accuracy 
+    loss_object = tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True, reduction='none')
 elif args.task == "wnli":
     train_data = tfds.load(name='glue/wnli', split='train').batch(args.batch_size)
     val_data = tfds.load(name='glue/wnli', split='validation').batch(args.batch_size)
     prepare_helper = prepare_wnli 
-    loss_object = tf.keras.losses.BinaryCrossentropy(from_logits=False, reduction='none')
-    accuracy_function = wnli_accuracy 
+    loss_object = tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True, reduction='none')
 else:
     raise Exception("Incorrect task specified")
 
@@ -390,7 +324,7 @@ transformer = Transformer(
     encoder_only=args.enc_only)
 
 ## Then, we create the learning rate schedule. ##
-initial_learning_rate = 0.0002
+initial_learning_rate = args.lr_rate
 num_train_steps = args.num_steps
 warmup_steps = args.warmup
 linear_decay = tf.keras.optimizers.schedules.PolynomialDecay(
@@ -403,8 +337,7 @@ warmup_schedule = tfm.optimization.lr_schedule.LinearWarmup(
     after_warmup_lr_sched = linear_decay,
     warmup_steps = warmup_steps
 )
-optimizer = tf.keras.optimizers.Adam(warmup_schedule, beta_1=0.9, beta_2=0.999,
-                                    epsilon=1e-9)
+optimizer = tf.keras.optimizers.Adam(warmup_schedule, beta_1=0.9, beta_2=0.999, epsilon=1e-9)
 
 train_loss = tf.keras.metrics.Mean(name='train_loss')
 train_accuracy = tf.keras.metrics.Mean(name='train_accuracy')
@@ -430,19 +363,21 @@ class DownstreamModel(tf.keras.Model):
         self.glue_task = glue_task
         self.transformer = transformer
 
-        if args.task == "cola":
+        if args.task == "cola" or args.task == "sst2" or args.task == "mrpc" or args.task == "qqp" or args.task == "stsb" or args.task == "mnli" or args.task == "qnli" or args.task == "rte" or args.task == "wnli":
+            self.layer_out = tf.keras.layers.Dense(target_vocab_size) ## Again, another hyperparameter to be tuned.
+        else:
             self.layer_expand = tf.keras.layers.Dense(64, activation=tf.keras.activations.relu)
             self.layer_out = tf.keras.layers.Dense(1, activation=tf.keras.activations.sigmoid)
-        else:
-            self.layer_out = tf.keras.layers.Dense(target_vocab_size) ## Again, another hyperparameter to be tuned.
 
-    def call(self, input):
-        output, _ = self.transformer(input)
-        if args.task == "cola":
-            output = self.layer_expand(output)
+    @tf.function
+    def call(self, inp):
+        output, _ = self.transformer(inp)
+        if args.task == "cola" or args.task == "sst2" or args.task == "mrpc" or args.task == "qqp" or args.task == "stsb" or args.task == "mnli" or args.task == "qnli" or args.task == "rte" or args.task == "wnli":
             return self.layer_out(output)
         else:
-            return self.layer_out(output)
+            output = self.layer_expand(output)
+            output = self.layer_out(output)
+            return output
 
 downstream_model = DownstreamModel(transformer, args.task, Constants.wiki_vocab_size)
 
@@ -451,11 +386,11 @@ def val_step(inp):
   enc_part, dec_part = prepare_helper(inp)
   enc_part, dec_part, real_val, weights = prepare_transformer_input(enc_part, dec_part)
 
-  predictions, _ = downstream_model([enc_part, dec_part],
-                                      training = False)
+  predictions = downstream_model([enc_part, dec_part],
+                                  training = False)
 
-  loss = loss_object(real_val, predictions, sample_weights=weights) 
-  accuracy = compute_accuracy(real_val, predictions)
+  loss = loss_object(real_val, predictions, sample_weight=weights) 
+  accuracy = compute_accuracy(real_val, predictions, weights)
 
   train_loss.update_state(loss)
   train_accuracy(accuracy)
@@ -466,10 +401,10 @@ def train_step(inp):
   enc_part, dec_part, real_val, weights = prepare_transformer_input(enc_part, dec_part)
 
   with tf.GradientTape() as tape:
-    predictions, _ = downstream_model([enc_part, dec_part],
-                                      training = True)
+    predictions = downstream_model([enc_part, dec_part],
+                                    training = True)
 
-    loss = loss_object(real_val, predictions, sample_weights=weights) 
+    loss = loss_object(real_val, predictions, sample_weight=weights) 
     accuracy = compute_accuracy(real_val, predictions, weights)
 
   gradients = tape.gradient(loss, downstream_model.trainable_variables)
@@ -478,10 +413,7 @@ def train_step(inp):
   train_loss.update_state(loss)
   train_accuracy(accuracy)
 
-EPOCHS = 30
-total_steps_required = args.num_steps
-
-steps_elapsed = 0
+EPOCHS = 3
 
 train_start = time.time()
 for epoch in range(EPOCHS):
@@ -490,9 +422,9 @@ for epoch in range(EPOCHS):
   train_loss.reset_states()
   train_accuracy.reset_states()
 
-  #pdb.set_trace()
   for batch, inp in enumerate(train_data):
     train_step(inp)
+    print(f'Epoch {epoch + 1} Loss {train_loss.result():.4f} Accuracy {train_accuracy.result():.4f}', flush=True)
 
   train_loss.reset_states()
   train_accuracy.reset_states()
