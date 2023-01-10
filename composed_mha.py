@@ -628,16 +628,6 @@ class Attention(tf.keras.layers.Layer):
     # projections. Splitting heads is automatically done during the linear
     # projections --> [batch_size, length, num_heads, dim_per_head].
     # `query` = [B, T, N ,H]
-    lin_trnfrm_start = time.time()
-    query = self._query_dense(query)
-
-    # `key` = [B, S, N, H]
-    key = self._key_dense(key)
-
-    # `value` = [B, S, N, H]
-    value = self._value_dense(value)
-    lin_trnfrm_end = time.time()
-    Stats.linear_transformation += (lin_trnfrm_end - lin_trnfrm_start)
 
     ## We build the projection matrices if we have not already.
     downsample_trfr_start = time.time()
@@ -649,8 +639,20 @@ class Attention(tf.keras.layers.Layer):
     ## We then transform the keys and values accordingly.
     key = _downsample_mat(key, self._rand_mat_keys)
     value = _downsample_mat(value, self._rand_mat_values)
-
     Stats.downsampling_time += time.time() - downsample_trfr_start
+
+    lin_trnfrm_start = time.time()
+    query = self._query_dense(query)
+
+    # `key` = [B, S, N, H]
+    key = self._key_dense(key)
+
+    # `value` = [B, S, N, H]
+    value = self._value_dense(value)
+    lin_trnfrm_end = time.time()
+    Stats.linear_transformation += (lin_trnfrm_end - lin_trnfrm_start)
+
+
     if self.projection_matrix_type is None:
       projection_matrix = None
     else:
