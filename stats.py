@@ -23,3 +23,8 @@ class Stats:
 
     ## For PerFormer. ##
     transformation_time = 0 # Time taken to map queries and keys to another domain.
+
+    ## MHA specific benchmarks. ##
+    linear_transformation = 0 ## Time taken for the X*W1, X*W2 and X*W3 products.
+
+    q_k_v_product = 0 ## Time taken for the efficient way of multiplying out the matrices (in accordance with the performer style.)

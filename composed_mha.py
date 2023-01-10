@@ -266,6 +266,7 @@ def noncausal_numerator(qs, ks, vs):
   Returns:
     Not-normalized FAVOR noncausal attention AV.
   """
+  ## What is this einsum actually doing? TODO, figure out.
   kvs = tf.einsum("lbhm,lbhd->bhmd", ks, vs)
   return tf.einsum("lbhm,bhmd->lbhd", qs, kvs)
 
@@ -402,12 +403,15 @@ def favor_attention(query,
   key_prime = tf.transpose(key_prime, [1, 0, 2, 3])  # [L,B,H,M]
   value = tf.transpose(value, [1, 0, 2, 3])  # [L,B,H,D]
 
+  attn_product_start = time.time()
   if causal:
     av_attention = causal_numerator(query_prime, key_prime, value)
     attention_normalizer = causal_denominator(query_prime, key_prime)
   else:
     av_attention = noncausal_numerator(query_prime, key_prime, value)
     attention_normalizer = noncausal_denominator(query_prime, key_prime)
+  attn_product_end = time.time()
+  Stats.q_k_v_product += (attn_product_end - attn_product_start)
   # TODO(kchoro): Add more comments.
   av_attention = tf.transpose(av_attention, [1, 0, 2, 3])
   attention_normalizer = tf.transpose(attention_normalizer, [1, 0, 2])
@@ -624,6 +628,7 @@ class Attention(tf.keras.layers.Layer):
     # projections. Splitting heads is automatically done during the linear
     # projections --> [batch_size, length, num_heads, dim_per_head].
     # `query` = [B, T, N ,H]
+    lin_trnfrm_start = time.time()
     query = self._query_dense(query)
 
     # `key` = [B, S, N, H]
@@ -631,6 +636,8 @@ class Attention(tf.keras.layers.Layer):
 
     # `value` = [B, S, N, H]
     value = self._value_dense(value)
+    lin_trnfrm_end = time.time()
+    Stats.linear_transformation += (lin_trnfrm_end - lin_trnfrm_start)
 
     ## We build the projection matrices if we have not already.
     downsample_trfr_start = time.time()

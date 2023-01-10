@@ -364,12 +364,15 @@ def favor_attention(query,
   key_prime = tf.transpose(key_prime, [1, 0, 2, 3])  # [L,B,H,M]
   value = tf.transpose(value, [1, 0, 2, 3])  # [L,B,H,D]
 
+  qkv_product_start = time.time()
   if causal:
     av_attention = causal_numerator(query_prime, key_prime, value)
     attention_normalizer = causal_denominator(query_prime, key_prime)
   else:
     av_attention = noncausal_numerator(query_prime, key_prime, value)
     attention_normalizer = noncausal_denominator(query_prime, key_prime)
+  qkv_product_end = time.time()
+  Stats.q_k_v_product += (qkv_product_end - qkv_product_start)
   # TODO(kchoro): Add more comments.
   av_attention = tf.transpose(av_attention, [1, 0, 2, 3])
   attention_normalizer = tf.transpose(attention_normalizer, [1, 0, 2])
@@ -587,6 +590,7 @@ class Attention(tf.keras.layers.Layer):
     #   N = `num_attention_heads`
     #   H = `size_per_head`
     # `query` = [B, T, N ,H]
+    linear_trfm_start = time.time()
     query = self._query_dense(query)
 
     # `key` = [B, S, N, H]
@@ -594,6 +598,8 @@ class Attention(tf.keras.layers.Layer):
 
     # `value` = [B, S, N, H]
     value = self._value_dense(value)
+    linear_trfm_end = time.time()
+    Stats.linear_transformation += (linear_trfm_end - linear_trfm_start)
 
     if self.projection_matrix_type is None:
       projection_matrix = None
