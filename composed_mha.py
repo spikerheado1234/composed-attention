@@ -42,7 +42,8 @@ def _downsample_mat(mat, rand_mat):
     Returns a down-sampled matrix of size: [B, K, N, H].
     """
 
-    output = tf.einsum('ks, bsnh -> bknh', rand_mat, mat) # Output is of shape: [B, N, K, H] after completing this step.
+    #output = tf.einsum('ks, bsnh -> bknh', rand_mat, mat) # Output is of shape: [B, N, K, H] after completing this step.
+    output = tf.einsum('ks, bsd -> bkd', rand_mat, mat) # Output is of shape: [B, N, K, H] after completing this step.
     # We then have to return back to the normal shape of: [B, K, N, H]
 
     return output
@@ -624,6 +625,7 @@ class Attention(tf.keras.layers.Layer):
     Returns:
       Attention layer output with shape [batch_size, length_query, hidden_size]
     """
+    # Original dimension of Q, K and V are -> [batch_size, seq_length, hidden_dimension]
     # Linearly project the query, key and value using different learned
     # projections. Splitting heads is automatically done during the linear
     # projections --> [batch_size, length, num_heads, dim_per_head].
