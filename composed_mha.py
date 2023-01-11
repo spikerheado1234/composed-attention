@@ -624,12 +624,6 @@ class Attention(tf.keras.layers.Layer):
     Returns:
       Attention layer output with shape [batch_size, length_query, hidden_size]
     """
-    # Original dimension of Q, K and V are -> [batch_size, seq_length, hidden_dimension]
-    # Linearly project the query, key and value using different learned
-    # projections. Splitting heads is automatically done during the linear
-    # projections --> [batch_size, length, num_heads, dim_per_head].
-    # `query` = [B, T, N ,H]
-
     ## We build the projection matrices if we have not already.
     downsample_trfr_start = tf.timestamp()
     if not self._built_proj_mat:
@@ -642,7 +636,12 @@ class Attention(tf.keras.layers.Layer):
     value = _downsample_mat(value, self._rand_mat_values)
     Stats.downsampling_time += (tf.timestamp() - downsample_trfr_start).numpy()
 
+    # Original dimension of Q, K and V are -> [batch_size, seq_length, hidden_dimension]
+    # Linearly project the query, key and value using different learned
+    # projections. Splitting heads is automatically done during the linear
+    # projections --> [batch_size, length, num_heads, dim_per_head].
     lin_trnfrm_start = tf.timestamp()
+    # `query` = [B, T, N ,H]
     query = self._query_dense(query)
 
     # `key` = [B, S, N, H]
