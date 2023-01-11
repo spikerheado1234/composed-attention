@@ -153,22 +153,22 @@ def locality_exp_matmul(qs, ks, vs, ds_ks, ds_vs, ws_qs, ws_ks, ws_vs):
     @tf.function
     def locality(qs, ks, vs, ds_ks, ds_vs, ws_qs, ws_ks, ws_vs):
         ## We interleave the einsums for better data locality.
-        qs = tf.einsum('bsd, dnh -> bsnh', qs, ws_qs)
-        ks = tf.einsum('ks, bsd -> bkd', ks, ds_ks)
-        ks = tf.einsum('bsd, dnh -> bsnh', ks, ws_ks)
-        vs = tf.einsum('bsd, dnh -> bsnh', vs, ws_vs)
-        vs = tf.einsum('ks, bsd -> bkd', vs, ds_vs)
+        qs = tf.tensordot(qs, ws_qs, axes=((2), (0)))
+        ks = tf.matmul(ds_ks, ks)
+        ks = tf.tensordot(ks, ws_ks, axes=((2), (0)))
+        vs = tf.matmul(ds_vs, vs)
+        vs = tf.tensordot(vs, ws_vs, axes=((2), (0)))
 
     @tf.function
     def not_local(qs, ks, vs, ds_ks, ds_vs, ws_qs, ws_ks, ws_vs):
-        ## First we do the einsums to downsample. 
-        ks = tf.einsum('ks, bsd -> bkd', ks, ds_ks)
-        vs = tf.einsum('ks, bsd -> bkd', vs, ds_vs)
+        ## First we do the matmuls to downsample. 
+        ks = tf.matmul(ds_ks, ks)
+        vs = tf.matmul(ds_vs, vs)
 
-        ## Then, we do the einsums to map to attn heads.
-        qs = tf.einsum('bsd, dnh -> bsnh', qs, ws_qs)
-        ks = tf.einsum('bsd, dnh -> bsnh', ks, ws_ks)
-        vs = tf.einsum('bsd, dnh -> bsnh', vs, ws_vs)
+        ## Then, we do the matmuls to map to attn heads.
+        qs = tf.tensordot(qs, ws_qs, axes=((2), (0)))
+        ks = tf.tensordot(ks, ws_ks, axes=((2), (0)))
+        vs = tf.tensordot(vs, ws_vs, axes=((2), (0)))
 
     a = time.time()
     for _ in range(100):
