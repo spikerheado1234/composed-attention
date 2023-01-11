@@ -189,6 +189,14 @@ def ginormous_einsum(qs, ks, vs, ds_ks, ds_vs, ws_qs, ws_ks, ws_vs):
 
     re_shaping_time = 0
 
+    ## We separate the re_shaping operation from the big_einsum because tensorflow doesn't allow timing in functions which are decorated with tf.function.
+    @tf.function
+    def re_shape(downsampled_values):
+        ## We then slice out and reduce_sum everything.
+        ks, vs = downsampled_values[:, :, :sequence_length, :], downsampled_values[:, :, sequence_length:, :]
+        ks = tf.reduce_sum(ks, axis=2)
+        vs = tf.reduce_sum(vs, axis=2)
+
     @tf.function
     def big_einsum(qs, ks, vs, ds_ks, ds_vs, ws_qs, ws_ks, ws_vs):
         nonlocal re_shaping_time
@@ -198,14 +206,7 @@ def ginormous_einsum(qs, ks, vs, ds_ks, ds_vs, ws_qs, ws_ks, ws_vs):
         downsampling_mats = tf.concat([ds_ks, ds_vs], axis=1)
         ## Seems like this tensor is too big. 
         downsampled_values = tf.einsum('ks, bsd -> bksd', downsampling_mats, inter_result)
-
-        ## We then slice out and reduce_sum everything.
-        reshape_start = tf.timestamp()
-        ks, vs = downsampled_values[:, :, :sequence_length, :], downsampled_values[:, :, sequence_length:, :]
-        ks = tf.reduce_sum(ks, axis=2)
-        vs = tf.reduce_sum(vs, axis=2)
-        reshape_end = tf.timestamp()
-        re_shaping_time += tf.get_static_value((reshape_end - reshape_start))
+        return downsampled_values
 
     @tf.function
     def little_einsum(qs, ks, vs, ds_ks, ds_vs, ws_qs, ws_ks, ws_vs):
@@ -214,7 +215,11 @@ def ginormous_einsum(qs, ks, vs, ds_ks, ds_vs, ws_qs, ws_ks, ws_vs):
     
     a = time.time()
     for _ in range(100):
-        big_einsum(qs, ks, vs, ds_ks, ds_vs, ws_qs, ws_ks, ws_vs)
+        downsampled_values = big_einsum(qs, ks, vs, ds_ks, ds_vs, ws_qs, ws_ks, ws_vs)
+        y = time.time()
+        re_shape(downsampled_values)
+        z = time.time()
+        re_shaping_time += (z-y)
     b = time.time()
     
     c = time.time()
