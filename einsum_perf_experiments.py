@@ -119,17 +119,17 @@ def locality_exp_einsum(qs, ks, vs, ds_ks, ds_vs, ws_qs, ws_ks, ws_vs):
     @tf.function
     def locality(qs, ks, vs, ds_ks, ds_vs, ws_qs, ws_ks, ws_vs):
         ## We interleave the einsums for better data locality.
-        qs = tf.einsum('bsd, dnh -> bsnh', qs, ws_qs)
-        ks = tf.einsum('ks, bsd -> bkd', ks, ds_ks)
+        ks = tf.einsum('ks, bsd -> bkd', ds_ks, ks)
         ks = tf.einsum('bsd, dnh -> bsnh', ks, ws_ks)
+        vs = tf.einsum('ks, bsd -> bkd', ds_vs, vs)
         vs = tf.einsum('bsd, dnh -> bsnh', vs, ws_vs)
-        vs = tf.einsum('ks, bsd -> bkd', vs, ds_vs)
+        qs = tf.einsum('bsd, dnh -> bsnh', qs, ws_qs)
 
     @tf.function
     def not_local(qs, ks, vs, ds_ks, ds_vs, ws_qs, ws_ks, ws_vs):
         ## First we do the einsums to downsample. 
-        ks = tf.einsum('ks, bsd -> bkd', ks, ds_ks)
-        vs = tf.einsum('ks, bsd -> bkd', vs, ds_vs)
+        ks = tf.einsum('ks, bsd -> bkd', ds_ks, ks)
+        vs = tf.einsum('ks, bsd -> bkd', ds_vs, vs)
 
         ## Then, we do the einsums to map to attn heads.
         qs = tf.einsum('bsd, dnh -> bsnh', qs, ws_qs)
