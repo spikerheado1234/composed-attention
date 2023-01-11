@@ -256,11 +256,49 @@ def matmul_einsum_schedule_exp(qs, ks, vs, ds_ks, ds_vs, ws_qs, ws_ks, ws_vs):
 
     with open("perf_benchmark.txt", "a+") as f:
         f.write(f'Matmul-Schedule: {b-a}  Einsum-Schedule: {d-c}\n')
-    
 
+## We try different schedules to beat the current best schedule, which consists of only einsums.
+def random_schedule_exp(qs, ks, vs, ds_ks, ds_vs, ws_qs, ws_ks, ws_vs):
+
+    @tf.function
+    def random_schedule(qs, ks, vs, ds_ks, ds_vs, ws_qs, ws_ks, ws_vs):
+        ## First we do the einsums to downsample. 
+        ks = tf.einsum('ks, bsd -> bkd', ds_ks, ks)
+        vs = tf.einsum('ks, bsd -> bkd', ds_vs, vs)
+
+        ## Then we try doing all the linear transforms using matmuls.
+        ks = tf.tensordot(ks, ws_ks, axes=((2), (0)))
+        vs = tf.tensordot(vs, ws_vs, axes=((2), (0)))
+        qs = tf.tensordot(qs, ws_qs, axes=((2), (0)))
+
+    @tf.function
+    def einsum_schedule(qs, ks, vs, ds_ks, ds_vs, ws_qs, ws_ks, ws_vs):
+        ## First we do the einsums to downsample. 
+        ks = tf.einsum('ks, bsd -> bkd', ds_ks, ks)
+        vs = tf.einsum('ks, bsd -> bkd', ds_vs, vs)
+
+        ## Then, we do the einsums to map to attn heads.
+        ks = tf.einsum('bsd, dnh -> bsnh', ks, ws_ks)
+        vs = tf.einsum('bsd, dnh -> bsnh', vs, ws_vs)
+        qs = tf.einsum('bsd, dnh -> bsnh', qs, ws_qs)
+
+    a = time.time()
+    for _ in range(100):
+        random_schedule(qs, ks, vs, ds_ks, ds_vs, ws_qs, ws_ks, ws_vs)
+    b = time.time()
+
+    c = time.time()
+    for _ in range(100):
+        einsum_schedule(qs, ks, vs, ds_ks, ds_vs, ws_qs, ws_ks, ws_vs)
+    d = time.time()
+
+    with open("perf_benchmark.txt", "a+") as f:
+        f.write(f'Random-schedule: {b-a} Best Einsum-Schedule: {d-c}\n')
+    
 # Call whichever experiment over here.
 #baking_matmul_exp()
 #locality_exp_einsum(xs, ys, zs, ds, dsv, ws, wy, wz)
 #ginormous_einsum(xs, ys, zs, ds, dsv, ws, wy, wz)
-matmul_einsum_schedule_exp(xs, ys, zs, ds, dsv, ws, wy, wz)
+#matmul_einsum_schedule_exp(xs, ys, zs, ds, dsv, ws, wy, wz)
+random_schedule_exp(xs, ys, zs, ds, dsv, ws, wy, wz)
 
