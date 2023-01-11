@@ -94,7 +94,6 @@ def baking_matmul_exp():
     with open("perf_benchmark.txt", "a+") as f:
         f.write(f'Non_baked_three_matmul: {b-a} baked_matmul_einsum: {d-c}\n')
 
-baking_matmul_exp()
 
 def linear_trfm_exp():
     a = time.time()
