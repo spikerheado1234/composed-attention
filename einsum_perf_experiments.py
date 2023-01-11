@@ -262,14 +262,10 @@ def random_schedule_exp(qs, ks, vs, ds_ks, ds_vs, ws_qs, ws_ks, ws_vs):
 
     @tf.function
     def random_schedule(qs, ks, vs, ds_ks, ds_vs, ws_qs, ws_ks, ws_vs):
-        ## First we do the einsums to downsample. 
-        ks = tf.einsum('ks, bsd -> bkd', ds_ks, ks)
-        vs = tf.einsum('ks, bsd -> bkd', ds_vs, vs)
-
-        ## Then we try doing all the linear transforms using matmuls.
-        ks = tf.tensordot(ks, ws_ks, axes=((2), (0)))
-        vs = tf.tensordot(vs, ws_vs, axes=((2), (0)))
-        qs = tf.tensordot(qs, ws_qs, axes=((2), (0)))
+        ## Two big einsums and one small einsum.
+        ks = tf.einsum('ks, bsd, dnh -> bknh', ds_ks, ks, ws_ks)
+        vs = tf.einsum('ks, bsd, dnh -> bknh', ds_vs, vs, ws_vs)
+        qs = tf.einsum('bsd, dnh -> bsnh', qs, ws_qs)
 
     @tf.function
     def einsum_schedule(qs, ks, vs, ds_ks, ds_vs, ws_qs, ws_ks, ws_vs):
