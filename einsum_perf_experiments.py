@@ -152,12 +152,12 @@ def locality_exp_matmul(qs, ks, vs, ds_ks, ds_vs, ws_qs, ws_ks, ws_vs):
 
     @tf.function
     def locality(qs, ks, vs, ds_ks, ds_vs, ws_qs, ws_ks, ws_vs):
-        ## We interleave the einsums for better data locality.
-        qs = tf.tensordot(qs, ws_qs, axes=((2), (0)))
+        ## We interleave the matmuls and tensordots for better data locality.
         ks = tf.matmul(ds_ks, ks)
         ks = tf.tensordot(ks, ws_ks, axes=((2), (0)))
         vs = tf.matmul(ds_vs, vs)
         vs = tf.tensordot(vs, ws_vs, axes=((2), (0)))
+        qs = tf.tensordot(qs, ws_qs, axes=((2), (0)))
 
     @tf.function
     def not_local(qs, ks, vs, ds_ks, ds_vs, ws_qs, ws_ks, ws_vs):
@@ -165,10 +165,10 @@ def locality_exp_matmul(qs, ks, vs, ds_ks, ds_vs, ws_qs, ws_ks, ws_vs):
         ks = tf.matmul(ds_ks, ks)
         vs = tf.matmul(ds_vs, vs)
 
-        ## Then, we do the matmuls to map to attn heads.
-        qs = tf.tensordot(qs, ws_qs, axes=((2), (0)))
+        ## Then, we do the tensordots to map to attn heads.
         ks = tf.tensordot(ks, ws_ks, axes=((2), (0)))
         vs = tf.tensordot(vs, ws_vs, axes=((2), (0)))
+        qs = tf.tensordot(qs, ws_qs, axes=((2), (0)))
 
     a = time.time()
     for _ in range(100):
@@ -184,4 +184,4 @@ def locality_exp_matmul(qs, ks, vs, ds_ks, ds_vs, ws_qs, ws_ks, ws_vs):
         f.write(f'Locality: {b-a}  Non-locality: {d-c}\n')
 # Call whichever experiment over here.
 #baking_matmul_exp()
-locality_exp_einsum(xs, ys, zs, ds, dsv, ws, wy, wz)
+locality_exp_matmul(xs, ys, zs, ds, dsv, ws, wy, wz)
