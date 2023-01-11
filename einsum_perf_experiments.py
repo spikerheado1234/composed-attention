@@ -56,34 +56,57 @@ def lin_matmul(xs, ws):
 def lin_einsum(xs, ws):
     return tf.einsum('bsd, dhk -> bshk', xs, ws)
 
-## simple test cases. ##
-## l = 2, b = 3, h = 4, m = 5, d = 5
-#qs = create_rng_mat((2,3,4,5))
-#ks = create_rng_mat((2,3,4,5))
-#vs = create_rng_mat((2,3,4,5))
+## We test out multiplying three matrices.
+
+## Next, we see the effect of baking in vs. two separate einsums.
+## xs -> inputs, ws -> weights for lin trfm, ds -> downsampling matrix. 
+## xs -> [batch_size, sequence_length, hidden dimension], ws -> [hidden dimension, num_heads, head_dimension]
+## ds -> [downsampling_factor, sequence_length].
+@tf.function
+def non_baked_matmul_einsum(xs, ws, ds):
+    a = tf.einsum('ds, bsh -> bdh', ds, xs) ## First we downsample.
+    return lin_einsum(a, ws) ## Then we apply the linear transformation.
+
+@tf.function
+def baked_matmul_einsum(xs,ws,ds):
+    return tf.einsum('ds, bsh, hnf -> bdnf', xs, ws, ds)
+
+@tf.function
+def non_baked_three_matmul(xs,ys,zs):
+    a = tf.matmul(xs, ys)
+    return tf.tensordot(a, zs, axes=((2), (0)))
 
 xs = create_rng_mat((32,14000,1024))
-ws = create_rng_mat((1024,8,128))
+ws = create_rng_mat((xs.shape[-1],8,128))
+ds = create_rng_mat((16,xs.shape[1]))
 
-lin_matmul(xs, ws)
+def baking_matmul_exp():
+    a = time.time()
+    for _ in range(100):
+        non_baked_three_matmul(ds, xs, ws)
+    b = time.time()
 
-lin_einsum(xs, ws)
+    c = time.time()
+    for _ in range(100):
+        baked_matmul_einsum(ds, xs, ws)
+    d = time.time()
 
-a = time.time()
-for _ in range(1000):
-    lin_matmul(xs, ws)
-b = time.time()
+    with open("perf_benchmark.txt", "a+") as f:
+        f.write(f'Non_baked_three_matmul: {b-a} baked_matmul_einsum: {d-c}\n')
 
-c = time.time()
-for _ in range(1000):
-    lin_einsum(xs, ws)
-d = time.time()
+baking_matmul_exp()
 
-with open("perf_benchmark.txt", "a+") as f:
-    f.write(f'matmul time: {b-a} einsum time: {d-c}\n')
+def linear_trfm_exp():
+    a = time.time()
+    for _ in range(1000):
+        lin_matmul(xs, ws)
+    b = time.time()
 
-#a = noncausal_numerator(qs, ks, vs)
-#b = noncausal_numerator_matmul(qs, ks, vs) 
-#print(is_equal(a, b))
-#print(a.shape)
-#print(b.shape)
+    c = time.time()
+    for _ in range(1000):
+        lin_einsum(xs, ws)
+    d = time.time()
+
+    with open("perf_benchmark.txt", "a+") as f:
+        f.write(f'matmul time: {b-a} einsum time: {d-c}\n')
+
