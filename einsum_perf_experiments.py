@@ -186,6 +186,9 @@ def locality_exp_matmul(qs, ks, vs, ds_ks, ds_vs, ws_qs, ws_ks, ws_vs):
 
 def ginormous_einsum(qs, ks, vs, ds_ks, ds_vs, ws_qs, ws_ks, ws_vs):
     global downsampling_value, sequence_length
+
+    re_shaping_time = 0
+
     @tf.function
     def big_einsum(qs, ks, vs, ds_ks, ds_vs, ws_qs, ws_ks, ws_vs):
         ## First we have to conacatenate all the qs, ks and vs
@@ -196,9 +199,12 @@ def ginormous_einsum(qs, ks, vs, ds_ks, ds_vs, ws_qs, ws_ks, ws_vs):
         downsampled_values = tf.einsum('ks, bsd -> bksd', downsampling_mats, inter_result)
 
         ## We then slice out and reduce_sum everything.
+        reshape_start = tf.timestamp()
         ks, vs = downsampled_values[:, :, :sequence_length, :], downsampled_values[:, :, sequence_length:, :]
         ks = tf.reduce_sum(ks, axis=2)
         vs = tf.reduce_sum(vs, axis=2)
+        reshape_end = tf.timestamp()
+        re_shaping_time += (reshape_end - reshape_start).numpy()
 
     @tf.function
     def little_einsum(qs, ks, vs, ds_ks, ds_vs, ws_qs, ws_ks, ws_vs):
@@ -216,7 +222,7 @@ def ginormous_einsum(qs, ks, vs, ds_ks, ds_vs, ws_qs, ws_ks, ws_vs):
     d = time.time()
 
     with open("perf_benchmark.txt", "a+") as f:
-        f.write(f'Big-einsum: {b-a} Separated Einsums: {d-c}\n')
+        f.write(f'Big-einsum: {b-a} Separated Einsums: {d-c} Re-shaping time: {re_shaping_time}\n')
 
 
 ## Compares the best matmul schedule with the best einsum schedule.
@@ -263,8 +269,13 @@ def random_schedule_exp(qs, ks, vs, ds_ks, ds_vs, ws_qs, ws_ks, ws_vs):
     @tf.function
     def random_schedule(qs, ks, vs, ds_ks, ds_vs, ws_qs, ws_ks, ws_vs):
         ## Two big einsums and one small einsum.
-        ks = tf.einsum('ks, bsd, dnh -> bknh', ds_ks, ks, ws_ks)
-        vs = tf.einsum('ks, bsd, dnh -> bknh', ds_vs, vs, ws_vs)
+        ks = tf.einsum('ks, bsd -> bkd', ds_ks, ks)
+        vs = tf.einsum('ks, bsd -> bkd', ds_vs, vs)
+
+        ## Lets try fusing the linear transformations and leaving the downsampling as a separate einsum.
+        ## TODO, implement this out.
+        ks = tf.einsum('bsd, dnh -> bsnh', ks, ws_ks)
+        vs = tf.einsum('bsd, dnh -> bsnh', vs, ws_vs)
         qs = tf.einsum('bsd, dnh -> bsnh', qs, ws_qs)
 
     @tf.function
@@ -296,5 +307,4 @@ def random_schedule_exp(qs, ks, vs, ds_ks, ds_vs, ws_qs, ws_ks, ws_vs):
 #locality_exp_einsum(xs, ys, zs, ds, dsv, ws, wy, wz)
 #ginormous_einsum(xs, ys, zs, ds, dsv, ws, wy, wz)
 #matmul_einsum_schedule_exp(xs, ys, zs, ds, dsv, ws, wy, wz)
-random_schedule_exp(xs, ys, zs, ds, dsv, ws, wy, wz)
-
+ginormous_einsum(xs, ys, zs, ds, dsv, ws, wy, wz)
