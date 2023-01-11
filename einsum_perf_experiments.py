@@ -70,12 +70,12 @@ lin_matmul(xs, ws)
 lin_einsum(xs, ws)
 
 a = time.time()
-for _ in range(100):
+for _ in range(1000):
     lin_matmul(xs, ws)
 b = time.time()
 
 c = time.time()
-for _ in range(100):
+for _ in range(1000):
     lin_einsum(xs, ws)
 d = time.time()
 
