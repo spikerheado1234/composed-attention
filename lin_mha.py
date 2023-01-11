@@ -6,7 +6,6 @@ modify it anyways.
 import collections
 import math
 import string
-import time
 
 import numpy as np
 import tensorflow as tf
@@ -597,7 +596,7 @@ class MultiHeadAttention(Layer):
         # `value` = [B, S, N, H]
         value = self._value_dense(value)
 
-        downsampling_time_start = time.time()
+        downsampling_time_start = tf.timestamp()
         # Before we down-sample we check if random matrix sizes are correct, else we re-modify them.
         if not _downsampling_shape_correct(key.shape, self._rand_mat_keys.shape) or not _downsampling_shape_correct(value.shape, self._rand_mat_values.shape):
             self._rand_mat_keys = _build_downsample_proj(self._downsample_k, (self._downsample_k, key.shape[1]))
@@ -607,8 +606,8 @@ class MultiHeadAttention(Layer):
         key = _downsample_mat(key, self._rand_mat_keys)
 
         value = _downsample_mat(value, self._rand_mat_values)
-        downsampling_time_end = time.time()
-        Stats.downsampling_time += downsampling_time_end - downsampling_time_start
+        downsampling_time_end = tf.timestamp()
+        Stats.downsampling_time += (downsampling_time_end - downsampling_time_start).numpy()
 
         # Attention_mask is originally: [1, T, S], must change to: [1, T, K] TODO, check if correct.
         attention_mask = attention_mask[:, :, :self._downsample_k]
