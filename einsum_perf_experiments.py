@@ -76,7 +76,8 @@ def non_baked_three_matmul(xs,ys,zs):
     a = tf.matmul(xs, ys) ## Downsampling
     return tf.tensordot(a, zs, axes=((2), (0))) ## Linear transformation.
 
-xs = create_rng_mat((32,14000,1024))
+## Parameters.
+xs = create_rng_mat((32,1024,1024))
 ys = create_rng_mat(xs.shape)
 zs = create_rng_mat(xs.shape)
 ws = create_rng_mat((xs.shape[-1],8,128))
@@ -197,18 +198,25 @@ def ginormous_einsum(qs, ks, vs, ds_ks, ds_vs, ws_qs, ws_ks, ws_vs):
         ks, vs = downsampled_values[:, :, :sequence_length, :], downsampled_values[:, :, sequence_length:, :]
         ks = tf.reduce_sum(ks, axis=2)
         vs = tf.reduce_sum(vs, axis=2)
-        return ks, vs
 
     @tf.function
     def little_einsum(qs, ks, vs, ds_ks, ds_vs, ws_qs, ws_ks, ws_vs):
         ks = tf.einsum('ks, bsd -> bkd', ds_ks, ks)
         vs = tf.einsum('ks, bsd -> bkd', ds_vs, vs)
-        return ks, vs
+    
+    a = time.time()
+    for _ in range(100):
+        big_einsum(qs, ks, vs, ds_ks, ds_vs, ws_qs, ws_ks, ws_vs)
+    b = time.time()
+    
+    c = time.time()
+    for _ in range(100):
+        little_einsum(qs, ks, vs, ds_ks, ds_vs, ws_qs, ws_ks, ws_vs)
+    d = time.time()
 
-    a,b = big_einsum(qs, ks, vs, ds_ks, ds_vs, ws_qs, ws_ks, ws_vs)
-    c,d = little_einsum(qs, ks, vs, ds_ks, ds_vs, ws_qs, ws_ks, ws_vs)
-    print(is_equal(a, c))
-    print(is_equal(b, d))
+    with open("perf_benchmark.txt", "a+") as f:
+        f.write(f'Big-einsum: {b-a} Separated Einsums: {d-c}\n')
+
 
 # Call whichever experiment over here.
 #baking_matmul_exp()
