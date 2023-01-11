@@ -25,7 +25,6 @@ from keras import initializers
 from keras import regularizers
 import fast_attention.util as util 
 from stats import Stats 
-import time
 import string
 
 BIG_CONSTANT = 1e8
@@ -354,25 +353,25 @@ def favor_attention(query,
   Returns:
     FAVOR normalized attention.
   """
-  transformation_start = time.time()
+  transformation_start = tf.timestamp()
   query_prime = kernel_transformation(query, True,
                                       projection_matrix)  # [B,L,H,M]
   key_prime = kernel_transformation(key, False, projection_matrix)  # [B,L,H,M]
-  transformation_end = time.time()
-  Stats.transformation_time += (transformation_end - transformation_start)
+  transformation_end = tf.timestamp()
+  Stats.transformation_time += (transformation_end - transformation_start).numpy()
   query_prime = tf.transpose(query_prime, [1, 0, 2, 3])  # [L,B,H,M]
   key_prime = tf.transpose(key_prime, [1, 0, 2, 3])  # [L,B,H,M]
   value = tf.transpose(value, [1, 0, 2, 3])  # [L,B,H,D]
 
-  qkv_product_start = time.time()
+  qkv_product_start = tf.timestamp()
   if causal:
     av_attention = causal_numerator(query_prime, key_prime, value)
     attention_normalizer = causal_denominator(query_prime, key_prime)
   else:
     av_attention = noncausal_numerator(query_prime, key_prime, value)
     attention_normalizer = noncausal_denominator(query_prime, key_prime)
-  qkv_product_end = time.time()
-  Stats.q_k_v_product += (qkv_product_end - qkv_product_start)
+  qkv_product_end = tf.timestamp()
+  Stats.q_k_v_product += (qkv_product_end - qkv_product_start).numpy()
   # TODO(kchoro): Add more comments.
   av_attention = tf.transpose(av_attention, [1, 0, 2, 3])
   attention_normalizer = tf.transpose(attention_normalizer, [1, 0, 2])
@@ -590,7 +589,7 @@ class Attention(tf.keras.layers.Layer):
     #   N = `num_attention_heads`
     #   H = `size_per_head`
     # `query` = [B, T, N ,H]
-    linear_trfm_start = time.time()
+    linear_trfm_start = tf.timestamp()
     query = self._query_dense(query)
 
     # `key` = [B, S, N, H]
@@ -598,8 +597,8 @@ class Attention(tf.keras.layers.Layer):
 
     # `value` = [B, S, N, H]
     value = self._value_dense(value)
-    linear_trfm_end = time.time()
-    Stats.linear_transformation += (linear_trfm_end - linear_trfm_start)
+    linear_trfm_end = tf.timestamp()
+    Stats.linear_transformation += (linear_trfm_end - linear_trfm_start).numpy()
 
     if self.projection_matrix_type is None:
       projection_matrix = None
