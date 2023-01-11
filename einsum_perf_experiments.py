@@ -94,7 +94,6 @@ def baking_matmul_exp():
     with open("perf_benchmark.txt", "a+") as f:
         f.write(f'Non_baked_three_matmul: {b-a} baked_matmul_einsum: {d-c}\n')
 
-baking_matmul_exp()
 
 def linear_trfm_exp():
     a = time.time()
@@ -110,3 +109,40 @@ def linear_trfm_exp():
     with open("perf_benchmark.txt", "a+") as f:
         f.write(f'matmul time: {b-a} einsum time: {d-c}\n')
 
+def locality_exp_einsum(qs, ks, vs, ds_ks, ds_vs, ws_qs, ws_ks, ws_vs):
+
+    @tf.function
+    def locality(qs, ks, vs, ds_ks, ds_vs, ws_qs, ws_ks, ws_vs):
+        ## We interleave the einsums for better data locality.
+        qs = tf.einsum('bsd, dnh -> bsnh', qs, ws_qs)
+        ks = tf.einsum('ks, bsd -> bkd', ks, ds_ks)
+        ks = tf.einsum('bsd, dnh -> bsnh', ks, ws_ks)
+        vs = tf.einsum('bsd, dnh -> bsnh', vs, ws_vs)
+        vs = tf.einsum('ks, bsd -> bkd', vs, ds_vs)
+
+    @tf.function
+    def not_local(qs, ks, vs, ds_ks, ds_vs, ws_qs, ws_ks, ws_vs):
+        ## First we do the einsums to downsample. 
+        ks = tf.einsum('ks, bsd -> bkd', ks, ds_ks)
+        vs = tf.einsum('ks, bsd -> bkd', vs, ds_vs)
+
+        ## Then, we do the einsums to map to attn heads.
+        qs = tf.einsum('bsd, dnh -> bsnh', qs, ws_qs)
+        ks = tf.einsum('bsd, dnh -> bsnh', ks, ws_ks)
+        vs = tf.einsum('bsd, dnh -> bsnh', vs, ws_vs)
+
+    a = time.time()
+    for _ in range(100):
+        locality(qs, ks, vs, ds_ks, ds_vs, ws_qs, ws_ks, ws_vs)
+    b = time.time()
+
+    c = time.time()
+    for _ in range(100):
+        not_local(qs, ks, vs, ds_ks, ds_vs, ws_qs, ws_ks, ws_vs)
+    d = time.time()
+
+    with open("perf_benchmark.txt", "a+") as f:
+        f.write(f'Locality: {b-a}  Non-locality: {d-c}\n')
+
+# Call whichever experiment over here.
+baking_matmul_exp()
