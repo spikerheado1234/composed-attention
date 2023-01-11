@@ -191,6 +191,7 @@ def ginormous_einsum(qs, ks, vs, ds_ks, ds_vs, ws_qs, ws_ks, ws_vs):
         ## First we downsample the ks and vs.
         inter_result = tf.concat([ks, vs], axis=1)
         downsampling_mats = tf.concat([ds_ks, ds_vs], axis=1)
+        ## Seems like this tensor is too big. 
         downsampled_values = tf.einsum('ks, bsd -> bksd', downsampling_mats, inter_result)
 
         ## We then slice out and reduce_sum everything.
@@ -210,7 +211,48 @@ def ginormous_einsum(qs, ks, vs, ds_ks, ds_vs, ws_qs, ws_ks, ws_vs):
     print(is_equal(a, c))
     print(is_equal(b, d))
 
+## Compares the best matmul schedule with the best einsum schedule.
+def matmul_einsum_schedule_exp(qs, ks, vs, ds_ks, ds_vs, ws_qs, ws_ks, ws_vs):
+
+    @tf.function
+    def matmul_schedule(qs, ks, vs, ds_ks, ds_vs, ws_qs, ws_ks, ws_vs):
+        ## First we do the matmuls to downsample. 
+        ks = tf.matmul(ds_ks, ks)
+        vs = tf.matmul(ds_vs, vs)
+
+        ## Then, we do the tensordots to map to attn heads.
+        ks = tf.tensordot(ks, ws_ks, axes=((2), (0)))
+        vs = tf.tensordot(vs, ws_vs, axes=((2), (0)))
+        qs = tf.tensordot(qs, ws_qs, axes=((2), (0)))
+
+    @tf.function
+    def einsum_schedule(qs, ks, vs, ds_ks, ds_vs, ws_qs, ws_ks, ws_vs):
+        ## First we do the einsums to downsample. 
+        ks = tf.einsum('ks, bsd -> bkd', ds_ks, ks)
+        vs = tf.einsum('ks, bsd -> bkd', ds_vs, vs)
+
+        ## Then, we do the einsums to map to attn heads.
+        ks = tf.einsum('bsd, dnh -> bsnh', ks, ws_ks)
+        vs = tf.einsum('bsd, dnh -> bsnh', vs, ws_vs)
+        qs = tf.einsum('bsd, dnh -> bsnh', qs, ws_qs)
+
+    a = time.time()
+    for _ in range(100):
+        matmul_schedule(qs, ks, vs, ds_ks, ds_vs, ws_qs, ws_ks, ws_vs)
+    b = time.time()
+
+    c = time.time()
+    for _ in range(100):
+        einsum_schedule(qs, ks, vs, ds_ks, ds_vs, ws_qs, ws_ks, ws_vs)
+    d = time.time()
+
+    with open("perf_benchmark.txt", "a+") as f:
+        f.write(f'Matmul-Schedule: {b-a}  Einsum-Schedule: {d-c}\n')
+    
+
 # Call whichever experiment over here.
 #baking_matmul_exp()
 #locality_exp_einsum(xs, ys, zs, ds, dsv, ws, wy, wz)
-ginormous_einsum(xs, ys, zs, ds, dsv, ws, wy, wz)
+#ginormous_einsum(xs, ys, zs, ds, dsv, ws, wy, wz)
+matmul_einsum_schedule_exp(xs, ys, zs, ds, dsv, ws, wy, wz)
+
