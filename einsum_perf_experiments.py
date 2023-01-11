@@ -84,6 +84,8 @@ wy = create_rng_mat(ws.shape)
 wz = create_rng_mat(ws.shape)
 ds = create_rng_mat((16,xs.shape[1]))
 dsv = create_rng_mat(ds.shape)
+downsampling_value = ds.shape[0]
+sequence_length = xs.shape[1]
 
 def baking_matmul_exp():
     a = time.time()
@@ -114,7 +116,6 @@ def linear_trfm_exp():
         f.write(f'matmul time: {b-a} einsum time: {d-c}\n')
 
 def locality_exp_einsum(qs, ks, vs, ds_ks, ds_vs, ws_qs, ws_ks, ws_vs):
-
     @tf.function
     def locality(qs, ks, vs, ds_ks, ds_vs, ws_qs, ws_ks, ws_vs):
         ## We interleave the einsums for better data locality.
@@ -149,7 +150,6 @@ def locality_exp_einsum(qs, ks, vs, ds_ks, ds_vs, ws_qs, ws_ks, ws_vs):
         f.write(f'Locality: {b-a}  Non-locality: {d-c}\n')
 
 def locality_exp_matmul(qs, ks, vs, ds_ks, ds_vs, ws_qs, ws_ks, ws_vs):
-
     @tf.function
     def locality(qs, ks, vs, ds_ks, ds_vs, ws_qs, ws_ks, ws_vs):
         ## We interleave the einsums for better data locality.
@@ -182,6 +182,35 @@ def locality_exp_matmul(qs, ks, vs, ds_ks, ds_vs, ws_qs, ws_ks, ws_vs):
 
     with open("perf_benchmark.txt", "a+") as f:
         f.write(f'Locality: {b-a}  Non-locality: {d-c}\n')
+
+def ginormous_einsum(qs, ks, vs, ds_ks, ds_vs, ws_qs, ws_ks, ws_vs):
+    global downsampling_value, sequence_length
+    @tf.function
+    def big_einsum(qs, ks, vs, ds_ks, ds_vs, ws_qs, ws_ks, ws_vs):
+        ## First we have to conacatenate all the qs, ks and vs
+        ## First we downsample the ks and vs.
+        inter_result = tf.concat([ks, vs], axis=1)
+        downsampling_mats = tf.concat([ds_ks, ds_vs], axis=1)
+        downsampled_values = tf.einsum('ks, bsd -> bksd', downsampling_mats, inter_result)
+
+        ## We then slice out and reduce_sum everything.
+        ks, vs = downsampled_values[:, :, :sequence_length, :], downsampled_values[:, :, sequence_length:, :]
+        ks = tf.reduce_sum(ks, axis=2)
+        vs = tf.reduce_sum(vs, axis=2)
+        return ks, vs
+
+    @tf.function
+    def little_einsum(qs, ks, vs, ds_ks, ds_vs, ws_qs, ws_ks, ws_vs):
+        ks = tf.einsum('ks, bsd -> bkd', ds_ks, ks)
+        vs = tf.einsum('ks, bsd -> bkd', ds_vs, vs)
+        return ks, vs
+
+    a,b = big_einsum(qs, ks, vs, ds_ks, ds_vs, ws_qs, ws_ks, ws_vs)
+    c,d = little_einsum(qs, ks, vs, ds_ks, ds_vs, ws_qs, ws_ks, ws_vs)
+    print(is_equal(a, c))
+    print(is_equal(b, d))
+
 # Call whichever experiment over here.
 #baking_matmul_exp()
-locality_exp_einsum(xs, ys, zs, ds, dsv, ws, wy, wz)
+#locality_exp_einsum(xs, ys, zs, ds, dsv, ws, wy, wz)
+ginormous_einsum(xs, ys, zs, ds, dsv, ws, wy, wz)
