@@ -77,8 +77,13 @@ def non_baked_three_matmul(xs,ys,zs):
     return tf.tensordot(a, zs, axes=((2), (0)))
 
 xs = create_rng_mat((32,14000,1024))
+ys = create_rng_mat(xs.shape)
+zs = create_rng_mat(xs.shape)
 ws = create_rng_mat((xs.shape[-1],8,128))
+wy = create_rng_mat(ws.shape)
+wz = create_rng_mat(ws.shape)
 ds = create_rng_mat((16,xs.shape[1]))
+dsv = create_rng_mat(ds.shape)
 
 def baking_matmul_exp():
     a = time.time()
@@ -145,4 +150,5 @@ def locality_exp_einsum(qs, ks, vs, ds_ks, ds_vs, ws_qs, ws_ks, ws_vs):
         f.write(f'Locality: {b-a}  Non-locality: {d-c}\n')
 
 # Call whichever experiment over here.
-baking_matmul_exp()
+#baking_matmul_exp()
+locality_exp_einsum(xs, ys, zs, ds, dsv, ws, wy, wz)
