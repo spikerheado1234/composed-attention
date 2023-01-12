@@ -683,13 +683,17 @@ class Attention(tf.keras.layers.Layer):
       cache["k"] = key
       cache["v"] = value
 
+    favour_start = tf.timestamp()
     attention_output = favor_attention(query, key, value,
                                        self.kernel_transformation, self.causal,
                                        projection_matrix)
+    favour_end = tf.timestamp()
+    Stats.favour_time += (favour_end - favour_start).numpy()
     local_ffn_start = tf.timestamp()
     attention_output = self.output_dense_layer(attention_output)
     local_ffn_end = tf.timestamp()
     Stats.ffn_time += (local_ffn_end - local_ffn_start).numpy()
+    Stats.mha_ffn += (local_ffn_end - local_ffn_start).numpy()
     if return_attention_scores:
       return attention_output, None # We return phony attention weights since it is never explicitly computed in the PerFormer.
 
