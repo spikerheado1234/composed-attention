@@ -503,8 +503,7 @@ class Attention(tf.keras.layers.Layer):
     einsum_equation, bias_axes, output_rank = _build_proj_equation(
         free_dims, bound_dims=1, output_dims=2
     )
-    #self._query_dense = tf.keras.layers.experimental.EinsumDense(
-    self._query_dense = ED(
+    self._query_dense = tf.keras.layers.experimental.EinsumDense(
         einsum_equation,
         output_shape=_get_output_shape(
             output_rank - 1, [self.num_heads, self.hidden_size]
@@ -516,8 +515,7 @@ class Attention(tf.keras.layers.Layer):
     einsum_equation, bias_axes, output_rank = _build_proj_equation(
         self._key_shape.rank - 1, bound_dims=1, output_dims=2
     )
-    #self._key_dense = tf.keras.layers.experimental.EinsumDense(
-    self._key_dense = ED(
+    self._key_dense = tf.keras.layers.experimental.EinsumDense(
         einsum_equation,
         output_shape=_get_output_shape(
             output_rank - 1, [self.num_heads, self.hidden_size]
@@ -529,8 +527,7 @@ class Attention(tf.keras.layers.Layer):
     einsum_equation, bias_axes, output_rank = _build_proj_equation(
         self._value_shape.rank - 1, bound_dims=1, output_dims=2
     )
-    #self._value_dense = tf.keras.layers.experimental.EinsumDense(
-    self._value_dense = ED(
+    self._value_dense = tf.keras.layers.experimental.EinsumDense(
         einsum_equation,
         output_shape=_get_output_shape(
             output_rank - 1, [self.num_heads, self.hidden_size]
