@@ -77,10 +77,12 @@ def non_baked_three_matmul(xs,ys,zs):
     return tf.tensordot(a, zs, axes=((2), (0))) ## Linear transformation.
 
 ## Parameters.
-xs = create_rng_mat((32,1024,1024))
+xs = create_rng_mat((32,14000,1024))
+#xs = create_rng_mat((2, 10, 5))
 ys = create_rng_mat(xs.shape)
 zs = create_rng_mat(xs.shape)
 ws = create_rng_mat((xs.shape[-1],8,128))
+#ws = create_rng_mat((xs.shape[-1],2,5))
 wy = create_rng_mat(ws.shape)
 wz = create_rng_mat(ws.shape)
 ds = create_rng_mat((16,xs.shape[1]))
@@ -307,10 +309,68 @@ def random_schedule_exp(qs, ks, vs, ds_ks, ds_vs, ws_qs, ws_ks, ws_vs):
 
     with open("perf_benchmark.txt", "a+") as f:
         f.write(f'Random-schedule: {b-a} Best Einsum-Schedule: {d-c}\n')
+
+def logical_test(qs, ks, vs, ds_ks, ds_vs, ws_qs, ws_ks, ws_vs):
+
+    @tf.function
+    def perf_method(qs, ks, vs, ds_ks, ds_vs, ws_qs, ws_ks, ws_vs):
+        ## They first do a weird re-sizing.
+        query_prime = tf.einsum('bsh, hnd -> bsnd', qs, ws_qs)
+        key_prime = tf.einsum('bsh, hnd -> bsnd', ks, ws_ks)
+        value = tf.einsum('bsh, hnd -> bsnd', vs, ws_vs)
+        query_prime = tf.transpose(query_prime, [1, 0, 2, 3])  # [L,B,H,M]
+        key_prime = tf.transpose(key_prime, [1, 0, 2, 3])  # [L,B,H,M]
+        value = tf.transpose(value, [1, 0, 2, 3])  # [L,B,H,D]
+
+        ## Then we do a weird einsum
+        kvs = tf.einsum("lbhm,lbhd->bhmd", key_prime, value)
+        attn = tf.einsum("lbhm,bhmd->lbhd", query_prime, kvs)
+        av_attention = tf.transpose(attn, [1, 0, 2, 3])
+        return av_attention 
+
+    @tf.function
+    def normal_method(qs, ks, vs, ds_ks, ds_vs, ws_qs, ws_ks, ws_vs):
+        ## First compute the linear transformations.
+        n_qs = tf.einsum('bsh, hnd -> bsnd', qs, ws_qs)
+        n_ks = tf.einsum('bsh, hnd -> bsnd', ks, ws_ks)
+        n_vs = tf.einsum('bsh, hnd -> bsnd', vs, ws_vs)
+        ## Now, this is 'normal' attention
+        attn = tf.einsum('aecd, abcd -> acbe', n_qs, n_ks)
+        attn = tf.einsum('acbe, aecd -> abcd', attn, n_vs)
+        return attn
+
+    def attn_matmul(qs, ks, vs, ds_ks, ds_vs, ws_qs, ws_ks, ws_vs):
+        ## First compute the linear transformations.
+        n_qs = tf.einsum('bsh, hnd -> bsnd', qs, ws_qs)
+        n_ks = tf.einsum('bsh, hnd -> bsnd', ks, ws_ks)
+        n_vs = tf.einsum('bsh, hnd -> bsnd', vs, ws_vs)
+        ## Now, for normal attention.
+        n_qs = tf.transpose(n_qs, [0, 2, 1, 3])
+        n_ks = tf.transpose(n_ks, [0, 2, 1, 3])
+        attn = tf.matmul(n_qs, n_ks, transpose_b=True)
+        n_vs = tf.transpose(n_vs, [0, 2, 3, 1])
+        attn = tf.matmul(attn, n_vs, transpose_b=True)
+        attn = tf.transpose(attn, [0, 2, 1, 3])
+        return attn
+
+    a = time.time()
+    for _ in range(100):
+        perf_method(qs, ks, vs, ds_ks, ds_vs, ws_qs, ws_ks, ws_vs)
+    b = time.time()
+
+    c = time.time()
+    for _ in range(100):
+        normal_method(qs, ks, vs, ds_ks, ds_vs, ws_qs, ws_ks, ws_vs)
+    d = time.time()
+
+    with open("perf_benchmark.txt", "a+") as f:
+        f.write(f'Perf-Method: {b-a} Normal-Method: {d-c}\n')
+
     
 # Call whichever experiment over here.
 #baking_matmul_exp()
 #locality_exp_einsum(xs, ys, zs, ds, dsv, ws, wy, wz)
 #ginormous_einsum(xs, ys, zs, ds, dsv, ws, wy, wz)
 #matmul_einsum_schedule_exp(xs, ys, zs, ds, dsv, ws, wy, wz)
-ginormous_einsum(xs, ys, zs, ds, dsv, ws, wy, wz)
+#ginormous_einsum(xs, ys, zs, ds, dsv, ws, wy, wz)
+logical_test(xs, ys, zs, ds, dsv, ws, wy, wz)
