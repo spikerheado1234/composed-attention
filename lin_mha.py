@@ -607,7 +607,7 @@ class MultiHeadAttention(Layer):
 
         value = _downsample_mat(value, self._rand_mat_values)
         downsampling_time_end = tf.timestamp()
-        Stats.downsampling_time += (downsampling_time_end - downsampling_time_start).numpy()
+        Stats.downsampling_time += (downsampling_time_end - downsampling_time_start)
 
         # Attention_mask is originally: [1, T, S], must change to: [1, T, K] TODO, check if correct.
         attention_mask = attention_mask[:, :, :self._downsample_k]
@@ -617,7 +617,7 @@ class MultiHeadAttention(Layer):
         local_ffn_start = tf.timestamp()
         attention_output = self._output_dense(attention_output)
         local_ffn_end = tf.timestamp()
-        Stats.ffn_time += (local_ffn_end - local_ffn_start).numpy()
+        Stats.ffn_time += (local_ffn_end - local_ffn_start)
 
         if query_is_ragged:
             attention_output = tf.RaggedTensor.from_tensor(

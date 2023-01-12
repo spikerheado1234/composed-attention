@@ -247,5 +247,5 @@ train_end = time.time()
 
 with open(f"benchmark_results_{args.attention_type}.txt", "a+") as f:
     f.write(f"Train Step Time: {Stats.train_step_time}, sequence length: {args.sequence_length}, downsampling value: {args.downsampling_k}, hidden_dim: {d_model}\n")
-    f.write(f"Forward Prop: {Stats.total_forward_prop_time} MHA {Stats.mha_time:.4f} MHA-Enc {Stats.mha_enc_time:.4f} MHA-FFN: {Stats.mha_ffn} Favour Attn: {Stats.favour_time} FFN {Stats.ffn_time:.4f} Downsampling {Stats.downsampling_time:.4f} Kernel-Transformation {Stats.transformation_time:.4f}  Computation: {Stats.gradient_computation} Optimisation Step: {Stats.optimser_step}\n")
-    f.write(f"Q-K-V Product: {Stats.q_k_v_product} Linear Transformation: {Stats.linear_transformation}\n")
+    f.write(f"Forward Prop: {Stats.total_forward_prop_time} MHA {tf.get_static_value(Stats.mha_time):.4f} MHA-Enc {tf.get_static_value(Stats.mha_enc_time):.4f} MHA-FFN: {tf.get_static_value(Stats.mha_ffn):.4f} Favour Attn: {tf.get_static_value(Stats.favour_time):.4f} FFN {tf.get_static_value(Stats.ffn_time):.4f} Downsampling {tf.get_static_value(Stats.downsampling_time):.4f} Kernel-Transformation {tf.get_static_value(Stats.transformation_time):.4f}  Computation: {Stats.gradient_computation} Optimisation Step: {Stats.optimser_step}\n")
+    f.write(f"Q-K-V Product: {tf.get_static_value(Stats.q_k_v_product):.4f} Linear Transformation: {tf.get_static_value(Stats.linear_transformation):.4f}\n")
