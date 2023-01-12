@@ -614,7 +614,10 @@ class MultiHeadAttention(Layer):
         attention_output, attention_scores = self._compute_attention(
             query, key, value, attention_mask, training
         )
+        local_ffn_start = tf.timestamp()
         attention_output = self._output_dense(attention_output)
+        local_ffn_end = tf.timestamp()
+        Stats.ffn_time += (local_ffn_end - local_ffn_start).numpy()
 
         if query_is_ragged:
             attention_output = tf.RaggedTensor.from_tensor(
