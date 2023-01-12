@@ -124,8 +124,8 @@ class EncoderLayer(tf.keras.layers.Layer):
         training=training, # A boolean indicating whether the layer should behave in training mode.
         )
     mha_enc_end = tf.timestamp()
-    Stats.mha_time += (mha_enc_end - mha_enc_start).numpy()
-    Stats.mha_enc_time += (mha_enc_end - mha_enc_start).numpy()
+    Stats.mha_time += (mha_enc_end - mha_enc_start)
+    Stats.mha_enc_time += (mha_enc_end - mha_enc_start)
     # Multi-head self-attention output after layer normalization and a residual/skip connection.
     out1 = self.layernorm1(x + attn_output)  # Shape `(batch_size, input_seq_len, d_model)`
 
@@ -133,7 +133,7 @@ class EncoderLayer(tf.keras.layers.Layer):
     ffn_start = tf.timestamp()
     ffn_output = self.ffn(out1)  # Shape `(batch_size, input_seq_len, d_model)`
     ffn_end = tf.timestamp()
-    Stats.ffn_time += (ffn_end - ffn_start).numpy()
+    Stats.ffn_time += (ffn_end - ffn_start)
     ffn_output = self.dropout1(ffn_output, training=training)
     # Point-wise feed-forward network output after layer normalization and a residual skip connection.
     out2 = self.layernorm2(out1 + ffn_output)  # Shape `(batch_size, input_seq_len, d_model)`.
@@ -163,7 +163,7 @@ class Encoder(tf.keras.layers.Layer):
     embedding_start = tf.timestamp()
     self.pos_embedding = PositionalEmbedding(input_vocab_size, d_model, length=sequence_length)
     embedding_end = tf.timestamp()
-    Stats.embedding_time += (embedding_end - embedding_start).numpy()
+    Stats.embedding_time += (embedding_end - embedding_start)
 
     # Encoder layers.
     self.enc_layers = [
@@ -308,8 +308,8 @@ class DecoderLayer(tf.keras.layers.Layer):
         training=training  # A boolean indicating whether the layer should behave in training mode.
         )
     mha_causal_end = tf.timestamp()
-    Stats.mha_time += (mha_causal_end - mha_causal_start).numpy()
-    Stats.mha_causal_time += (mha_causal_end - mha_causal_start).numpy()
+    Stats.mha_time += (mha_causal_end - mha_causal_start)
+    Stats.mha_causal_time += (mha_causal_end - mha_causal_start)
 
     # Masked multi-head self-attention output after layer normalization and a residual/skip connection.
     out1 = self.layernorm1(attn_masked + x)
@@ -332,8 +332,8 @@ class DecoderLayer(tf.keras.layers.Layer):
         training=training  # A boolean indicating whether the layer should behave in training mode.
     )
     mha_enc_dec_end = tf.timestamp()
-    Stats.mha_time += (mha_enc_dec_end - mha_enc_dec_start).numpy()
-    Stats.mha_enc_dec_time += (mha_enc_dec_end - mha_enc_dec_start).numpy()
+    Stats.mha_time += (mha_enc_dec_end - mha_enc_dec_start)
+    Stats.mha_enc_dec_time += (mha_enc_dec_end - mha_enc_dec_start)
 
     # Multi-head cross-attention output after layer normalization and a residual/skip connection.
     out2 = self.layernorm2(attn_cross + out1)  # (batch_size, target_seq_len, d_model)
@@ -342,7 +342,7 @@ class DecoderLayer(tf.keras.layers.Layer):
     ffn_start = tf.timestamp()
     ffn_output = self.ffn(out2)  # Shape `(batch_size, target_seq_len, d_model)`.
     ffn_end = tf.timestamp()
-    Stats.ffn_time += (ffn_end - ffn_start).numpy()
+    Stats.ffn_time += (ffn_end - ffn_start)
     ffn_output = self.dropout1(ffn_output, training=training)
     out3 = self.layernorm3(ffn_output + out2)  # Shape `(batch_size, target_seq_len, d_model)`.
 

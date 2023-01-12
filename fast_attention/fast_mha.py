@@ -358,7 +358,7 @@ def favor_attention(query,
                                       projection_matrix)  # [B,L,H,M]
   key_prime = kernel_transformation(key, False, projection_matrix)  # [B,L,H,M]
   transformation_end = tf.timestamp()
-  Stats.transformation_time += (transformation_end - transformation_start).numpy()
+  Stats.transformation_time += (transformation_end - transformation_start)
   query_prime = tf.transpose(query_prime, [1, 0, 2, 3])  # [L,B,H,M]
   key_prime = tf.transpose(key_prime, [1, 0, 2, 3])  # [L,B,H,M]
   value = tf.transpose(value, [1, 0, 2, 3])  # [L,B,H,D]
@@ -371,7 +371,7 @@ def favor_attention(query,
     av_attention = noncausal_numerator(query_prime, key_prime, value)
     attention_normalizer = noncausal_denominator(query_prime, key_prime)
   qkv_product_end = tf.timestamp()
-  Stats.q_k_v_product += (qkv_product_end - qkv_product_start).numpy()
+  Stats.q_k_v_product += (qkv_product_end - qkv_product_start)
   # TODO(kchoro): Add more comments.
   av_attention = tf.transpose(av_attention, [1, 0, 2, 3])
   attention_normalizer = tf.transpose(attention_normalizer, [1, 0, 2])
@@ -598,7 +598,7 @@ class Attention(tf.keras.layers.Layer):
     # `value` = [B, S, N, H]
     value = self._value_dense(value)
     linear_trfm_end = tf.timestamp()
-    Stats.linear_transformation += (linear_trfm_end - linear_trfm_start).numpy()
+    Stats.linear_transformation += (linear_trfm_end - linear_trfm_start)
 
     if self.projection_matrix_type is None:
       projection_matrix = None
@@ -635,12 +635,12 @@ class Attention(tf.keras.layers.Layer):
                                        self.kernel_transformation, self.causal,
                                        projection_matrix)
     favour_attn_end = tf.timestamp()
-    Stats.favour_time += (favour_attn_end - favour_attn_start).numpy()
+    Stats.favour_time += (favour_attn_end - favour_attn_start)
     local_ffn_start = tf.timestamp()
     attention_output = self.output_dense_layer(attention_output)
     local_ffn_end = tf.timestamp()
-    Stats.ffn_time += (local_ffn_end - local_ffn_start).numpy()
-    Stats.mha_ffn += (local_ffn_end - local_ffn_start).numpy()
+    Stats.ffn_time += (local_ffn_end - local_ffn_start)
+    Stats.mha_ffn += (local_ffn_end - local_ffn_start)
     if return_attention_scores:
       return attention_output, None # We return phony attention weights since it is never explicitly computed in the PerFormer.
 
