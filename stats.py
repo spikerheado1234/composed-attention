@@ -28,3 +28,7 @@ class Stats:
     linear_transformation = 0 ## Time taken for the X*W1, X*W2 and X*W3 products.
 
     q_k_v_product = 0 ## Time taken for the efficient way of multiplying out the matrices (in accordance with the performer style.)
+    
+    mha_ffn = 0 ## Time in the MHA spent on FFN.
+
+    favour_time = 0 ## Time in the MHA spent on the favour attention.
