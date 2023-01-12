@@ -77,7 +77,7 @@ def non_baked_three_matmul(xs,ys,zs):
     return tf.tensordot(a, zs, axes=((2), (0))) ## Linear transformation.
 
 ## Parameters.
-xs = create_rng_mat((32,14000,1024))
+xs = create_rng_mat((32,1024,1024))
 ys = create_rng_mat(xs.shape)
 zs = create_rng_mat(xs.shape)
 ws = create_rng_mat((xs.shape[-1],8,128))
@@ -199,6 +199,7 @@ def ginormous_einsum(qs, ks, vs, ds_ks, ds_vs, ws_qs, ws_ks, ws_vs):
 
     @tf.function
     def big_einsum(qs, ks, vs, ds_ks, ds_vs, ws_qs, ws_ks, ws_vs):
+        nonlocal re_shaping_time
         ## First we have to conacatenate all the qs, ks and vs
         ## First we downsample the ks and vs.
         inter_result = tf.concat([ks, vs], axis=1)
