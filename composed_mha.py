@@ -642,14 +642,14 @@ class Attention(tf.keras.layers.Layer):
     # projections. Splitting heads is automatically done during the linear
     # projections --> [batch_size, length, num_heads, dim_per_head].
     #lin_trnfrm_start = tf.timestamp()
-    # `query` = [B, T, N ,H]
-    query = self._query_dense(query)
 
     # `key` = [B, S, N, H]
     key = self._key_dense(key)
 
     # `value` = [B, S, N, H]
     value = self._value_dense(value)
+    # `query` = [B, T, N ,H]
+    query = self._query_dense(query)
     #lin_trnfrm_end = tf.timestamp()
     #Stats.linear_transformation += (lin_trnfrm_end - lin_trnfrm_start)
 
