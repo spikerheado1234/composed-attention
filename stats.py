@@ -32,3 +32,8 @@ class Stats:
     mha_ffn = 0 ## Time in the MHA spent on FFN.
 
     favour_time = 0 ## Time in the MHA spent on the favour attention.
+
+    transpose_time = 0 ## Time taken to transpose keys queries and values in favour attention
+
+    expand_dims_time = 0 ## Time taken to expand the dimension in favour attention.
+    

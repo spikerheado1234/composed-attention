@@ -405,9 +405,13 @@ def favor_attention(query,
   key_prime = kernel_transformation(key, False, projection_matrix)  # [B,L,H,M]
   transformation_end = time.time()
   Stats.transformation_time += (transformation_end - transformation_start)
+
+  transpose_time_start = time.time()
   query_prime = tf.transpose(query_prime, [1, 0, 2, 3])  # [L,B,H,M]
   key_prime = tf.transpose(key_prime, [1, 0, 2, 3])  # [L,B,H,M]
   value = tf.transpose(value, [1, 0, 2, 3])  # [L,B,H,D]
+  transpose_time_end = time.time()
+  Stats.transpose_time += transpose_time_end - transpose_time_start
 
   attn_product_start = time.time()
   if causal:
@@ -419,10 +423,17 @@ def favor_attention(query,
   attn_product_end = time.time()
   Stats.q_k_v_product += (attn_product_end - attn_product_start)
   # TODO(kchoro): Add more comments.
+  transpose_time_start = time.time()
   av_attention = tf.transpose(av_attention, [1, 0, 2, 3])
   attention_normalizer = tf.transpose(attention_normalizer, [1, 0, 2])
+  transpose_time_end = time.time()
+  Stats.transpose_time += transpose_time_end - transpose_time_start
+
+  expand_dims_start = time.time()
   attention_normalizer = tf.expand_dims(attention_normalizer,
                                         len(attention_normalizer.shape))
+  expand_dims_end = time.time()
+  Stats.expand_dims_time += (expand_dims_end - expand_dims_start)
   return av_attention / attention_normalizer
 
 
