@@ -647,11 +647,16 @@ class Attention(tf.keras.layers.Layer):
         self._rand_mat_keys = _build_downsample_proj(self._downsample_k, (self._downsample_k, key.shape[1]))
         self._rand_mat_values = _build_downsample_proj(self._downsample_k, (self._downsample_k, value.shape[1]))
         self._built_proj_mat = True
+    downsample_mat_gen_end = time.time()
+    Stats.downsampling_mat_gen += (downsample_mat_gen_end - downsample_trfr_start)
 
+    downsample_mat_mul_start = time.time()
     ## We then transform the keys and values accordingly.
     key = _downsample_mat(key, self._rand_mat_keys)
     value = _downsample_mat(value, self._rand_mat_values)
-    Stats.downsampling_time += (time.time() - downsample_trfr_start)
+    downsample_trfr_end = time.time()
+    Stats.downsampling_time += (downsample_trfr_end - downsample_trfr_start)
+    Stats.downsampling_mat_mul += (downsample_trfr_end - downsample_mat_mul_start) 
 
     # Original dimension of Q, K and V are -> [batch_size, seq_length, hidden_dimension]
     # Linearly project the query, key and value using different learned
