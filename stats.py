@@ -36,4 +36,8 @@ class Stats:
     transpose_time = 0 ## Time taken to transpose keys queries and values in favour attention
 
     expand_dims_time = 0 ## Time taken to expand the dimension in favour attention.
+
+    downsampling_mat_gen = 0 ## Time taken to generate the random matrix.
+
+    downsampling_mat_mul = 0 ## Time taken to for the transformations: E1*K, E2*V.
     
