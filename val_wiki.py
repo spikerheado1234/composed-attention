@@ -27,6 +27,7 @@ parser.add_argument('--num_checkpoints', dest='checkpoint_num', type=int, defaul
 parser.add_argument('--step_count', dest='num_steps', type=int, default=500000, help='the number of steps as input to pre-training.')
 parser.add_argument('--learning_rate', dest='lr_rate', type=float, default=0.1, help='the largest constant in the lr schedule.')
 parser.add_argument('--warmup', dest='warmup', default=10000, type=int, help='The number of warmup steps required during pre-training.')
+parser.add_argument('--checkpoint', dest='checkpoint', default=1, type=int, help='A checkpoint to start validating on.')
 
 args = parser.parse_args()
 
@@ -88,7 +89,7 @@ class MaskedLM(tf.keras.Model):
 masked_lm = MaskedLM(transformer, Constants.wiki_vocab_size, False)
 
 # Lets use a new learning rate here.
-initial_learning_rate = 2e-5
+initial_learning_rate = args.lr_rate
 num_train_steps = args.num_steps
 warmup_steps = 10000
 linear_decay = tf.keras.optimizers.schedules.PolynomialDecay(
@@ -181,25 +182,20 @@ def train_step(inputs, labels):
   train_accuracy(accuracy)
   train_perplexity(perplexity_function(train_loss.result()))
 
-num_checkpoints = args.checkpoint_num
-curr_checkpoint = 2
+curr_checkpoint = args.checkpoint
 
 ## We first restore the initial model checkpoint we wish to validate. ##
 ckpt.restore(f'{checkpoint_path}/ckpt-{curr_checkpoint}')
-while curr_checkpoint <= num_checkpoints:
 
-  train_loss.reset_states()
-  train_accuracy.reset_states()
-  train_perplexity.reset_states()
+train_loss.reset_states()
+train_accuracy.reset_states()
+train_perplexity.reset_states()
 
-  for (batch, (inp, tar)) in enumerate(val_batches):
-    train_step(inp, tar)
+for (batch, (inp, tar)) in enumerate(val_batches):
+  train_step(inp, tar)
 
-  print(f'Checkpoint {curr_checkpoint} Batch {batch} Loss {train_loss.result():.4f} Perplexity: {train_perplexity.result():.4f} Accuracy {train_accuracy.result():.4f}', flush=True)
+print(f'Checkpoint {curr_checkpoint} Batch {batch} Loss {train_loss.result():.4f} Perplexity: {train_perplexity.result():.4f} Accuracy {train_accuracy.result():.4f}', flush=True)
 
-  with open(f'./{args.attention_type}_val_data_{args.lr_rate}_{args.warmup}.txt', 'a+') as f:
-    f.write(f'{train_loss.result():.4f} {train_accuracy.result():.4f}\n')
+with open(f'./{args.attention_type}_val_data_{args.lr_rate}_{args.warmup}.txt', 'a+') as f:
+  f.write(f'{train_loss.result():.4f} {train_accuracy.result():.4f}\n')
   
-  curr_checkpoint += 2
-  ## Restore the next checkpoint and continue. ##
-  ckpt.restore(f'{checkpoint_path}/ckpt-{curr_checkpoint}')
