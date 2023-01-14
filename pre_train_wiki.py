@@ -44,7 +44,7 @@ BATCH_SIZE = args.batch_size
 
 ## We make the batches here. ##
 train_batches = make_batches(train_ds, BUFFER_SIZE, BATCH_SIZE)
-
+val_batches = make_batches(val_ds, BUFFER_SIZE,BATCH_SIZE)
 ## Hyperparameters ##
 num_layers = args.layers
 d_model = 512
@@ -52,6 +52,7 @@ dff = 2048
 num_attention_heads = 8
 dropout_rate = 0.1
 rank = args.rank
+val_iter_freq = 10000
 
 transformer = Transformer(
     num_layers=num_layers,
@@ -130,6 +131,9 @@ train_loss = tf.keras.metrics.Mean(name='train_loss')
 train_accuracy = tf.keras.metrics.Mean(name='train_accuracy')
 train_perplexity = tf.keras.metrics.Mean(name='train_perplexity')
 
+val_loss = tf.keras.metrics.Mean(name='val_loss')
+val_accuracy = tf.keras.metrics.Mean(name='train_accuracy')
+
 checkpoint_path = './checkpoints/train/' + str(args.attention_type) + '/' + str(initial_learning_rate) + '/' + str(args.warmup)
 
 ckpt = tf.train.Checkpoint(step=tf.Variable(1),
@@ -198,6 +202,21 @@ def compute_distribution(inp):
   else:
     distribution[3] += 1
 
+def val_step(inputs, labels):
+
+  (inp, tar_inp) = inputs
+  tar_real = labels
+
+  (inp, tar_inp), tar_real, weight = mask_data(inp)
+
+  predictions, _ = masked_lm([inp, tar_inp],
+                                training = True)
+  loss = loss_object(tar_real, predictions, sample_weight=weight[:, 1:]) 
+  accuracy = accuracy_function(tar_real, predictions, weight[:, 1:])
+
+  val_loss.update_state(loss, sample_weight=weight[:, 1:])
+  val_accuracy(accuracy)
+
 def train_step(inputs, labels):
 
   (inp, tar_inp) = inputs
@@ -257,16 +276,21 @@ for epoch in range(EPOCHS):
 
     steps_elapsed += 1
 
-  if (epoch + 1) % 5 == 0:
-    ckpt_save_path = ckpt_manager.save()
-    print(f'Saving checkpoint for epoch {epoch+1} at {ckpt_save_path}', flush=True)
+    ## Here, we validate the data.
+    if steps_elapsed % val_iter_freq == 0 and steps_elapsed != 0:
+      val_loss.reset_states()
+      val_accuracy.reset_states()
 
+      for (batch, (inp, tar)) in enumerate(val_batches):
+        val_step(inp, tar)
+
+      with open(f'./{args.attention_type}_val_data.txt', "a+") as f:
+        f.write(f'{val_loss.result():.4f} {val_accuracy.result():.4f}\n')
 
   print(f'Epoch {epoch + 1} Loss {train_loss.result():.4f} Accuracy {train_accuracy.result():.4f}', flush=True)
 
   print(f'Time taken for 1 epoch: {time.time() - start:.2f} secs\n', flush=True)
 
-
 train_end = time.time()
 
-print(f'Total training time: {train_end-train_start}\n', flush=True)
+print(f'Total training + validation time: {train_end-train_start}\n', flush=True)
