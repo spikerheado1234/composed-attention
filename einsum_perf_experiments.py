@@ -72,17 +72,17 @@ def baked_matmul_einsum(xs,ws,ds):
     return tf.einsum('ds, bsh, hnf -> bdnf', xs, ws, ds)
 
 @tf.function
-def non_baked_three_matmul(xs,ys,zs):
-    a = tf.matmul(xs, ys) ## Downsampling
-    return tf.tensordot(a, zs, axes=((2), (0))) ## Linear transformation.
+def non_baked_three_matmul(xs,ys,zs): # Re-write matmulwith tensordot.
+    a = tf.matmul(xs, ys) ## Downsampling -> linformer matrix multiplication EK.
+    return tf.tensordot(a, zs, axes=((2), (0))) ## Linear transformation. -> (EK)*W
 
 ## Parameters.
-xs = create_rng_mat((32,14000,1024))
-#xs = create_rng_mat((2, 10, 5))
+#xs = create_rng_mat((32,14000,1024))
+xs = create_rng_mat((2, 10, 5))
 ys = create_rng_mat(xs.shape)
 zs = create_rng_mat(xs.shape)
-ws = create_rng_mat((xs.shape[-1],8,128))
-#ws = create_rng_mat((xs.shape[-1],2,5))
+#ws = create_rng_mat((xs.shape[-1],8,128))
+ws = create_rng_mat((xs.shape[-1],2,5))
 wy = create_rng_mat(ws.shape)
 wz = create_rng_mat(ws.shape)
 ds = create_rng_mat((16,xs.shape[1]))
@@ -118,6 +118,7 @@ def linear_trfm_exp():
     with open("perf_benchmark.txt", "a+") as f:
         f.write(f'matmul time: {b-a} einsum time: {d-c}\n')
 
+## QKV -> in performer and the Comp, QW, KW, VW -> Linear Transformations -> MHA QKV (7%), linear (20%) -> 27% -> Where is the performance going?
 def locality_exp_einsum(qs, ks, vs, ds_ks, ds_vs, ws_qs, ws_ks, ws_vs):
     @tf.function
     def locality(qs, ks, vs, ds_ks, ds_vs, ws_qs, ws_ks, ws_vs):
@@ -232,6 +233,43 @@ def ginormous_einsum(qs, ks, vs, ds_ks, ds_vs, ws_qs, ws_ks, ws_vs):
     with open("perf_benchmark.txt", "a+") as f:
         f.write(f'Big-einsum: {b-a} Separated Einsums: {d-c} Re-shaping time: {re_shaping_time}\n')
 
+## This experiment tests whether a schedule of purely tensordots can outcompete the equivalent
+## Schedule best found schedule of einsums.
+def tensordot_einsum_exp(qs, ks, vs, ds_ks, ds_vs, ws_qs, ws_ks, ws_vs):
+    @tf.function
+    def matmul_schedule(qs, ks, vs, ds_ks, ds_vs, ws_qs, ws_ks, ws_vs):
+        ## First we do the matmuls to downsample. 
+        ks = tf.map_fn(lambda x : tf.tensordot(ds_ks, x, axes=((1), (0))), ks)
+        vs = tf.map_fn(lambda x : tf.tensordot(ds_vs, x, axes=((1), (0))), vs)
+
+        ## Then, we do the tensordots to map to attn heads.
+        ks = tf.tensordot(ks, ws_ks, axes=((2), (0)))
+        vs = tf.tensordot(vs, ws_vs, axes=((2), (0)))
+        qs = tf.tensordot(qs, ws_qs, axes=((2), (0)))
+
+    @tf.function
+    def einsum_schedule(qs, ks, vs, ds_ks, ds_vs, ws_qs, ws_ks, ws_vs):
+        ## First we do the einsums to downsample. 
+        ks = tf.einsum('ks, bsd -> bkd', ds_ks, ks)
+        vs = tf.einsum('ks, bsd -> bkd', ds_vs, vs)
+
+        ## Then, we do the einsums to map to attn heads.
+        ks = tf.einsum('bsd, dnh -> bsnh', ks, ws_ks)
+        vs = tf.einsum('bsd, dnh -> bsnh', vs, ws_vs)
+        qs = tf.einsum('bsd, dnh -> bsnh', qs, ws_qs)
+
+    a = time.time()
+    for _ in range(100):
+        matmul_schedule(qs, ks, vs, ds_ks, ds_vs, ws_qs, ws_ks, ws_vs)
+    b = time.time()
+
+    c = time.time()
+    for _ in range(100): 
+        einsum_schedule(qs, ks, vs, ds_ks, ds_vs, ws_qs, ws_ks, ws_vs)
+    d = time.time()
+    
+    with open("perf_benchmark.txt", "a+") as f:
+        f.write(f'Tensordot-Schedule: {b-a}  Einsum-Schedule: {d-c}\n')
 
 ## Compares the best matmul schedule with the best einsum schedule.
 def matmul_einsum_schedule_exp(qs, ks, vs, ds_ks, ds_vs, ws_qs, ws_ks, ws_vs):
@@ -239,7 +277,7 @@ def matmul_einsum_schedule_exp(qs, ks, vs, ds_ks, ds_vs, ws_qs, ws_ks, ws_vs):
     @tf.function
     def matmul_schedule(qs, ks, vs, ds_ks, ds_vs, ws_qs, ws_ks, ws_vs):
         ## First we do the matmuls to downsample. 
-        ks = tf.matmul(ds_ks, ks)
+        ks = tf.matmul(ds_ks, ks) # Convert matmuls into tensordots and re-check. -> TODO.
         vs = tf.matmul(ds_vs, vs)
 
         ## Then, we do the tensordots to map to attn heads.
@@ -310,6 +348,7 @@ def random_schedule_exp(qs, ks, vs, ds_ks, ds_vs, ws_qs, ws_ks, ws_vs):
     with open("perf_benchmark.txt", "a+") as f:
         f.write(f'Random-schedule: {b-a} Best Einsum-Schedule: {d-c}\n')
 
+## This is unfinished, TODO, complete.
 def logical_test(qs, ks, vs, ds_ks, ds_vs, ws_qs, ws_ks, ws_vs):
 
     @tf.function
@@ -318,6 +357,12 @@ def logical_test(qs, ks, vs, ds_ks, ds_vs, ws_qs, ws_ks, ws_vs):
         query_prime = tf.einsum('bsh, hnd -> bsnd', qs, ws_qs)
         key_prime = tf.einsum('bsh, hnd -> bsnd', ks, ws_ks)
         value = tf.einsum('bsh, hnd -> bsnd', vs, ws_vs)
+        """
+        I think I can re-write this as the following:
+        no query, key and value transposition.
+        then kvs = tf.einsum('bsnd, bsne -> bsnd', ks, vs). Feels like this is correct.
+        then attn = tf.einsum('bsnd, bsne -> bsnd', qs, kvs)
+        """
         query_prime = tf.transpose(query_prime, [1, 0, 2, 3])  # [L,B,H,M]
         key_prime = tf.transpose(key_prime, [1, 0, 2, 3])  # [L,B,H,M]
         value = tf.transpose(value, [1, 0, 2, 3])  # [L,B,H,D]
@@ -326,7 +371,7 @@ def logical_test(qs, ks, vs, ds_ks, ds_vs, ws_qs, ws_ks, ws_vs):
         kvs = tf.einsum("lbhm,lbhd->bhmd", key_prime, value)
         attn = tf.einsum("lbhm,bhmd->lbhd", query_prime, kvs)
         av_attention = tf.transpose(attn, [1, 0, 2, 3])
-        return av_attention 
+        return av_attention
 
     @tf.function
     def normal_method(qs, ks, vs, ds_ks, ds_vs, ws_qs, ws_ks, ws_vs):
@@ -374,4 +419,5 @@ def logical_test(qs, ks, vs, ds_ks, ds_vs, ws_qs, ws_ks, ws_vs):
 #ginormous_einsum(xs, ys, zs, ds, dsv, ws, wy, wz)
 #matmul_einsum_schedule_exp(xs, ys, zs, ds, dsv, ws, wy, wz)
 #ginormous_einsum(xs, ys, zs, ds, dsv, ws, wy, wz)
-logical_test(xs, ys, zs, ds, dsv, ws, wy, wz)
+#logical_test(xs, ys, zs, ds, dsv, ws, wy, wz)
+tensordot_einsum_exp(xs, ys, zs, ds, dsv, ws, wy, wz)
