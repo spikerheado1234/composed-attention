@@ -239,11 +239,11 @@ def tensordot_einsum_exp(qs, ks, vs, ds_ks, ds_vs, ws_qs, ws_ks, ws_vs):
     @tf.function
     def matmul_schedule(qs, ks, vs, ds_ks, ds_vs, ws_qs, ws_ks, ws_vs):
         ## First we do the matmuls to downsample. 
-        ks = tf.map_fn(lambda x : tf.tensordot(ds_ks, x, axes=((1), (0))), ks)
-        vs = tf.map_fn(lambda x : tf.tensordot(ds_vs, x, axes=((1), (0))), vs)
 
         ## Then, we do the tensordots to map to attn heads.
+        ks = tf.map_fn(lambda x : tf.tensordot(ds_ks, x, axes=((1), (0))), ks)
         ks = tf.tensordot(ks, ws_ks, axes=((2), (0)))
+        vs = tf.map_fn(lambda x : tf.tensordot(ds_vs, x, axes=((1), (0))), vs)
         vs = tf.tensordot(vs, ws_vs, axes=((2), (0)))
         qs = tf.tensordot(qs, ws_qs, axes=((2), (0)))
 
@@ -397,6 +397,7 @@ def logical_test(qs, ks, vs, ds_ks, ds_vs, ws_qs, ws_ks, ws_vs):
         attn = tf.einsum('acbe, aecd -> abcd', attn, n_vs)
         return attn
 
+    @tf.function
     def attn_matmul(qs, ks, vs, ds_ks, ds_vs, ws_qs, ws_ks, ws_vs):
         ## First compute the linear transformations.
         n_qs = tf.einsum('bsh, hnd -> bsnd', qs, ws_qs)
