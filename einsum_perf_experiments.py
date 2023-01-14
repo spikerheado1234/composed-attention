@@ -77,11 +77,11 @@ def non_baked_three_matmul(xs,ys,zs): # Re-write matmulwith tensordot.
     return tf.tensordot(a, zs, axes=((2), (0))) ## Linear transformation. -> (EK)*W
 
 ## Parameters.
-xs = create_rng_mat((32,14000,1024))
-#xs = create_rng_mat((2, 10, 5))
+#xs = create_rng_mat((32,14000,1024))
+xs = create_rng_mat((32, 1024, 512))
 ys = create_rng_mat(xs.shape)
 zs = create_rng_mat(xs.shape)
-ws = create_rng_mat((xs.shape[-1],8,128))
+ws = create_rng_mat((xs.shape[-1],8,64))
 #ws = create_rng_mat((xs.shape[-1],2,5))
 wy = create_rng_mat(ws.shape)
 wz = create_rng_mat(ws.shape)
