@@ -350,10 +350,9 @@ def random_schedule_exp(qs, ks, vs, ds_ks, ds_vs, ws_qs, ws_ks, ws_vs):
 
 ## This is unfinished, TODO, complete.
 def logical_test(qs, ks, vs, ds_ks, ds_vs, ws_qs, ws_ks, ws_vs):
-
     """
     Current state:
-    perf_method = perf_einsum = attn_matmul (All different attention computation schedules.)
+    perf_method = perf_einsum_transpose = attn_matmul = perf_einsum_pure (All different attention computation schedules.)
     """
     @tf.function
     def perf_method(qs, ks, vs, ds_ks, ds_vs, ws_qs, ws_ks, ws_vs):
@@ -369,9 +368,10 @@ def logical_test(qs, ks, vs, ds_ks, ds_vs, ws_qs, ws_ks, ws_vs):
         kvs = tf.einsum("lbhm,lbhd->bhmd", key_prime, value)
         attn = tf.einsum("lbhm,bhmd->lbhd", query_prime, kvs)
         av_attention = tf.transpose(attn, [1, 0, 2, 3])
+        return av_attention
 
     @tf.function
-    def perf_einsum(qs, ks, vs, ds_ks, ds_vs, ws_qs, ws_ks, ws_vs):
+    def perf_einsum_transpose(qs, ks, vs, ds_ks, ds_vs, ws_qs, ws_ks, ws_vs):
         query_prime = tf.einsum('bsh, hnd -> bsnd', qs, ws_qs)
         key_prime = tf.einsum('bsh, hnd -> bsnd', ks, ws_ks)
         value = tf.einsum('bsh, hnd -> bsnd', vs, ws_vs)
@@ -380,10 +380,25 @@ def logical_test(qs, ks, vs, ds_ks, ds_vs, ws_qs, ws_ks, ws_vs):
         key_prime = tf.transpose(key_prime, [0, 2, 1, 3])
         value = tf.transpose(value, [0, 2, 1, 3])
         query_prime = tf.transpose(query_prime, [0, 2, 1, 3])
-        kvs = tf.einsum("bhsd, bhse -> bhde", key_prime, value)
+        kvs = tf.einsum("bhsd, bhse -> bhde", key_prime, value) 
         kvs = tf.transpose(kvs, [0, 1, 3, 2])
         attn = tf.einsum('bhsd, bhed -> bhse', query_prime, kvs)
         attn = tf.transpose(attn, [0, 2, 1, 3])
+        return attn
+
+    @tf.function
+    def perf_einsum_pure(qs, ks, vs, ds_ks, ds_vs, ws_qs, ws_ks, ws_vs):
+        query_prime = tf.einsum('bsh, hnd -> bsnd', qs, ws_qs)
+        key_prime = tf.einsum('bsh, hnd -> bsnd', ks, ws_ks)
+        value = tf.einsum('bsh, hnd -> bsnd', vs, ws_vs)
+
+        ### The goal is to incorporate the transpostiions into the einsums. If this is possible.
+        query_prime = tf.transpose(query_prime, [0, 2, 1, 3]) 
+        kvs = tf.einsum('bshd, bshe -> bhde', key_prime, value) 
+        kvs = tf.transpose(kvs, [0, 1, 3, 2])
+        attn = tf.einsum('bhse, bhde -> bhsd', query_prime, kvs)
+        attn = tf.transpose(attn, [0, 2, 1, 3])
+        return attn
 
     @tf.function
     def normal_method(qs, ks, vs, ds_ks, ds_vs, ws_qs, ws_ks, ws_vs):
@@ -419,7 +434,7 @@ def logical_test(qs, ks, vs, ds_ks, ds_vs, ws_qs, ws_ks, ws_vs):
 
     c = time.time()
     for _ in range(100):
-        perf_einsum(qs, ks, vs, ds_ks, ds_vs, ws_qs, ws_ks, ws_vs)
+        perf_einsum_pure(qs, ks, vs, ds_ks, ds_vs, ws_qs, ws_ks, ws_vs)
     d = time.time()
 
     with open("perf_benchmark.txt", "a+") as f:
