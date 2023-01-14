@@ -339,6 +339,7 @@ def logical_test(qs, ks, vs, ds_ks, ds_vs, ws_qs, ws_ks, ws_vs):
         attn = tf.einsum('acbe, aecd -> abcd', attn, n_vs)
         return attn
 
+    @tf.function
     def attn_matmul(qs, ks, vs, ds_ks, ds_vs, ws_qs, ws_ks, ws_vs):
         ## First compute the linear transformations.
         n_qs = tf.einsum('bsh, hnd -> bsnd', qs, ws_qs)
