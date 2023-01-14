@@ -77,12 +77,12 @@ def non_baked_three_matmul(xs,ys,zs): # Re-write matmulwith tensordot.
     return tf.tensordot(a, zs, axes=((2), (0))) ## Linear transformation. -> (EK)*W
 
 ## Parameters.
-#xs = create_rng_mat((32,14000,1024))
-xs = create_rng_mat((2, 10, 5))
+xs = create_rng_mat((32,14000,1024))
+#xs = create_rng_mat((2, 10, 5))
 ys = create_rng_mat(xs.shape)
 zs = create_rng_mat(xs.shape)
-#ws = create_rng_mat((xs.shape[-1],8,128))
-ws = create_rng_mat((xs.shape[-1],2,5))
+ws = create_rng_mat((xs.shape[-1],8,128))
+#ws = create_rng_mat((xs.shape[-1],2,5))
 wy = create_rng_mat(ws.shape)
 wz = create_rng_mat(ws.shape)
 ds = create_rng_mat((16,xs.shape[1]))
@@ -239,11 +239,11 @@ def tensordot_einsum_exp(qs, ks, vs, ds_ks, ds_vs, ws_qs, ws_ks, ws_vs):
     @tf.function
     def matmul_schedule(qs, ks, vs, ds_ks, ds_vs, ws_qs, ws_ks, ws_vs):
         ## First we do the matmuls to downsample. 
-        ks = tf.map_fn(lambda x : tf.tensordot(ds_ks, x, axes=((1), (0))), ks)
-        vs = tf.map_fn(lambda x : tf.tensordot(ds_vs, x, axes=((1), (0))), vs)
 
         ## Then, we do the tensordots to map to attn heads.
+        ks = tf.map_fn(lambda x : tf.tensordot(ds_ks, x, axes=((1), (0))), ks)
         ks = tf.tensordot(ks, ws_ks, axes=((2), (0)))
+        vs = tf.map_fn(lambda x : tf.tensordot(ds_vs, x, axes=((1), (0))), vs)
         vs = tf.tensordot(vs, ws_vs, axes=((2), (0)))
         qs = tf.tensordot(qs, ws_qs, axes=((2), (0)))
 
