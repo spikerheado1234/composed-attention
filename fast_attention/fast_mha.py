@@ -20,6 +20,7 @@ import math
 import numpy as np
 from keras import regularizers
 import tensorflow as tf
+import time
 from keras import constraints
 from keras import initializers
 from keras import regularizers
@@ -353,30 +354,41 @@ def favor_attention(query,
   Returns:
     FAVOR normalized attention.
   """
-  #transformation_start = tf.timestamp()
+  transformation_start = time.time()
   query_prime = kernel_transformation(query, True,
                                       projection_matrix)  # [B,L,H,M]
   key_prime = kernel_transformation(key, False, projection_matrix)  # [B,L,H,M]
-  #transformation_end = tf.timestamp()
-  #Stats.transformation_time += (transformation_end - transformation_start)
+  transformation_end = time.time()
+  Stats.transformation_time += (transformation_end - transformation_start)
+  transpose_time_start = time.time()
   query_prime = tf.transpose(query_prime, [1, 0, 2, 3])  # [L,B,H,M]
   key_prime = tf.transpose(key_prime, [1, 0, 2, 3])  # [L,B,H,M]
   value = tf.transpose(value, [1, 0, 2, 3])  # [L,B,H,D]
+  transpose_time_end = time.time()
+  Stats.transpose_time += transpose_time_end - transpose_time_start
 
-  #qkv_product_start = tf.timestamp()
+  qkv_product_start = time.time()
   if causal:
     av_attention = causal_numerator(query_prime, key_prime, value)
     attention_normalizer = causal_denominator(query_prime, key_prime)
   else:
     av_attention = noncausal_numerator(query_prime, key_prime, value)
     attention_normalizer = noncausal_denominator(query_prime, key_prime)
-  #qkv_product_end = tf.timestamp()
-  #Stats.q_k_v_product += (qkv_product_end - qkv_product_start)
+  qkv_product_end = time.time()
+  Stats.q_k_v_product += (qkv_product_end - qkv_product_start)
   # TODO(kchoro): Add more comments.
+
+  transpose_time_start = time.time()
   av_attention = tf.transpose(av_attention, [1, 0, 2, 3])
   attention_normalizer = tf.transpose(attention_normalizer, [1, 0, 2])
+  transpose_time_end = time.time()
+
+  expand_dims_start = time.time()
   attention_normalizer = tf.expand_dims(attention_normalizer,
                                         len(attention_normalizer.shape))
+  expand_dims_end = time.time()
+  Stats.expand_dims_time += (expand_dims_end - expand_dims_start)
+  Stats.transpose_time += transpose_time_end - transpose_time_start
   return av_attention / attention_normalizer
 
 
@@ -589,7 +601,7 @@ class Attention(tf.keras.layers.Layer):
     #   N = `num_attention_heads`
     #   H = `size_per_head`
     # `query` = [B, T, N ,H]
-    #linear_trfm_start = tf.timestamp()
+    linear_trfm_start = time.time()
     query = self._query_dense(query)
 
     # `key` = [B, S, N, H]
@@ -597,8 +609,8 @@ class Attention(tf.keras.layers.Layer):
 
     # `value` = [B, S, N, H]
     value = self._value_dense(value)
-    #linear_trfm_end = tf.timestamp()
-    #Stats.linear_transformation += (linear_trfm_end - linear_trfm_start)
+    linear_trfm_end = time.time()
+    Stats.linear_transformation += (linear_trfm_end - linear_trfm_start)
 
     if self.projection_matrix_type is None:
       projection_matrix = None
@@ -630,17 +642,17 @@ class Attention(tf.keras.layers.Layer):
       cache["k"] = key
       cache["v"] = value
 
-    #favour_attn_start = tf.timestamp()
+    favour_attn_start = time.time()
     attention_output = favor_attention(query, key, value,
                                        self.kernel_transformation, self.causal,
                                        projection_matrix)
-    #favour_attn_end = tf.timestamp()
-    #Stats.favour_time += (favour_attn_end - favour_attn_start)
-    #local_ffn_start = tf.timestamp()
+    favour_attn_end = time.time()
+    Stats.favour_time += (favour_attn_end - favour_attn_start)
+    local_ffn_start = time.time()
     attention_output = self.output_dense_layer(attention_output)
-    #local_ffn_end = tf.timestamp()
-    #Stats.ffn_time += (local_ffn_end - local_ffn_start)
-    #Stats.mha_ffn += (local_ffn_end - local_ffn_start)
+    local_ffn_end = time.time()
+    Stats.ffn_time += (local_ffn_end - local_ffn_start)
+    Stats.mha_ffn += (local_ffn_end - local_ffn_start)
     if return_attention_scores:
       return attention_output, None # We return phony attention weights since it is never explicitly computed in the PerFormer.
 
