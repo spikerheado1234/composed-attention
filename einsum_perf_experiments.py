@@ -392,12 +392,8 @@ def logical_test(qs, ks, vs, ds_ks, ds_vs, ws_qs, ws_ks, ws_vs):
         key_prime = tf.einsum('bsh, hnd -> bsnd', ks, ws_ks)
         value = tf.einsum('bsh, hnd -> bsnd', vs, ws_vs)
 
-        ### The goal is to incorporate the transpostiions into the einsums. If this is possible.
-        query_prime = tf.transpose(query_prime, [0, 2, 1, 3]) 
         kvs = tf.einsum('bshd, bshe -> bhde', key_prime, value) 
-        kvs = tf.transpose(kvs, [0, 1, 3, 2])
-        attn = tf.einsum('bhse, bhde -> bhsd', query_prime, kvs)
-        attn = tf.transpose(attn, [0, 2, 1, 3])
+        attn = tf.einsum('bshd, bhde -> bshe', query_prime, kvs)
         return attn
 
     @tf.function
