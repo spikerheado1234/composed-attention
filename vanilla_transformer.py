@@ -82,17 +82,21 @@ class EncoderLayer(tf.keras.layers.Layer):
       ## Lets just try a different kernel
       self.mha = PerfMHA(hidden_size=d_model,
           num_heads=num_attention_heads,
-          attention_dropout=dropout_rate,
+          attention_dropout=dropout_rate
           ## Delete everything from this point onwards and it will default to a relu_kernel.
-          nb_random_features=10,
-          kernel_transformation=softmax_kernel_transformation,
-          projection_matrix_type="Create"
+          #nb_random_features=2,
+          #kernel_transformation=softmax_kernel_transformation,
+          #projection_matrix_type="Create"
           )
     elif attention_type == 'CompMHA':
       self.mha = CompMHA(hidden_size=d_model,
           num_heads=num_attention_heads,
           attention_dropout=dropout_rate,
           downsample_k=downsampling_value
+          ## Delete everything from this point onwards and it will default to a relu_kernel.
+          #nb_random_features=2,
+          #kernel_transformation=softmax_kernel_transformation,
+          #projection_matrix_type="Create"
         )
     else: # Default to normal attention.
       self.mha = MHA(
