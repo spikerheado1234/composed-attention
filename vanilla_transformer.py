@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 from multi_head_attn import MultiHeadAttention as MHA
 from lin_mha import MultiHeadAttention as LinMHA
 from fast_attention.fast_mha import Attention as PerfMHA
+from fast_attention.fast_mha import relu_kernel_transformation, softmax_kernel_transformation 
 from composed_mha import Attention as CompMHA
 from stats import Stats 
 import time
@@ -78,9 +79,14 @@ class EncoderLayer(tf.keras.layers.Layer):
           downsample_k=downsampling_value
           )
     elif attention_type == 'PerfMHA':
+      ## Lets just try a different kernel
       self.mha = PerfMHA(hidden_size=d_model,
           num_heads=num_attention_heads,
-          attention_dropout=dropout_rate
+          attention_dropout=dropout_rate,
+          ## Delete everything from this point onwards and it will default to a relu_kernel.
+          nb_random_features=10,
+          kernel_transformation=softmax_kernel_transformation,
+          projection_matrix_type="Create"
           )
     elif attention_type == 'CompMHA':
       self.mha = CompMHA(hidden_size=d_model,
