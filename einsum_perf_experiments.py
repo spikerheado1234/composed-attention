@@ -360,6 +360,8 @@ def logical_test(qs, ks, vs, ds_ks, ds_vs, ws_qs, ws_ks, ws_vs):
         query_prime = tf.einsum('bsh, hnd -> bsnd', qs, ws_qs)
         key_prime = tf.einsum('bsh, hnd -> bsnd', ks, ws_ks)
         value = tf.einsum('bsh, hnd -> bsnd', vs, ws_vs)
+
+        ## Transpositions that the performer schedule does.
         query_prime = tf.transpose(query_prime, [1, 0, 2, 3])  # [L,B,H,M]
         key_prime = tf.transpose(key_prime, [1, 0, 2, 3])  # [L,B,H,M]
         value = tf.transpose(value, [1, 0, 2, 3])  # [L,B,H,D]
@@ -367,24 +369,17 @@ def logical_test(qs, ks, vs, ds_ks, ds_vs, ws_qs, ws_ks, ws_vs):
         ## Then we do a weird einsum. The question is why?
         kvs = tf.einsum("lbhm,lbhd->bhmd", key_prime, value)
         attn = tf.einsum("lbhm,bhmd->lbhd", query_prime, kvs)
+  
+        ## This is the code for the attention normalier.
+        all_ones = tf.ones([key_prime.shape[0]], dtype=tf.int64)
+        ks_sum = tf.einsum("lbhm,l->bhm", key_prime, all_ones)
+        attention_normalizer = tf.einsum("lbhm,bhm->lbh", query_prime, ks_sum)
+
         av_attention = tf.transpose(attn, [1, 0, 2, 3])
-        return av_attention
+        attention_normalizer = tf.transpose(attention_normalizer, [1, 0, 2])
+        attention_normalizer = tf.expand_dims(attention_normalizer, len(attention_normalizer.shape))
 
-    @tf.function
-    def perf_einsum_transpose(qs, ks, vs, ds_ks, ds_vs, ws_qs, ws_ks, ws_vs):
-        query_prime = tf.einsum('bsh, hnd -> bsnd', qs, ws_qs)
-        key_prime = tf.einsum('bsh, hnd -> bsnd', ks, ws_ks)
-        value = tf.einsum('bsh, hnd -> bsnd', vs, ws_vs)
-
-        ### The goal is to incorporate the transpostiions into the einsums. If this is possible.
-        key_prime = tf.transpose(key_prime, [0, 2, 1, 3])
-        value = tf.transpose(value, [0, 2, 1, 3])
-        query_prime = tf.transpose(query_prime, [0, 2, 1, 3])
-        kvs = tf.einsum("bhsd, bhse -> bhde", key_prime, value) 
-        kvs = tf.transpose(kvs, [0, 1, 3, 2])
-        attn = tf.einsum('bhsd, bhed -> bhse', query_prime, kvs)
-        attn = tf.transpose(attn, [0, 2, 1, 3])
-        return attn
+        return av_attention / attention_normalizer
 
     @tf.function
     def perf_einsum_pure(qs, ks, vs, ds_ks, ds_vs, ws_qs, ws_ks, ws_vs):
@@ -394,7 +389,13 @@ def logical_test(qs, ks, vs, ds_ks, ds_vs, ws_qs, ws_ks, ws_vs):
 
         kvs = tf.einsum('bshd, bshe -> bhde', key_prime, value) 
         attn = tf.einsum('bshd, bhde -> bshe', query_prime, kvs)
-        return attn
+
+        ## Code for the attention normalizer.
+        ks_sum = tf.einsum("blhm -> bhm", key_prime)
+        attention_normalizer = tf.einsum("blhm,bhm->blh", query_prime, ks_sum)
+        attention_normalizer = tf.expand_dims(attention_normalizer, len(attention_normalizer.shape))
+
+        return attn / attention_normalizer
 
     @tf.function
     def normal_method(qs, ks, vs, ds_ks, ds_vs, ws_qs, ws_ks, ws_vs):
