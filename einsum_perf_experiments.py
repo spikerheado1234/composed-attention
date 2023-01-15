@@ -81,8 +81,8 @@ xs = create_rng_mat((32,14000,1024))
 #xs = create_rng_mat((32, 1024, 512))
 ys = create_rng_mat(xs.shape)
 zs = create_rng_mat(xs.shape)
-ws = create_rng_mat((xs.shape[-1],8,64))
-#ws = create_rng_mat((xs.shape[-1],2,5))
+ws = create_rng_mat((xs.shape[-1],8,128))
+#ws = create_rng_mat((xs.shape[-1], 8, 64))
 wy = create_rng_mat(ws.shape)
 wz = create_rng_mat(ws.shape)
 ds = create_rng_mat((16,xs.shape[1]))
@@ -387,13 +387,13 @@ def logical_test(qs, ks, vs, ds_ks, ds_vs, ws_qs, ws_ks, ws_vs):
         key_prime = tf.einsum('bsh, hnd -> bsnd', ks, ws_ks)
         value = tf.einsum('bsh, hnd -> bsnd', vs, ws_vs)
 
-        kvs = tf.einsum('bshd, bshe -> bhde', key_prime, value) 
-        attn = tf.einsum('bshd, bhde -> bshe', query_prime, kvs)
-
         ## Code for the attention normalizer.
         ks_sum = tf.einsum("blhm -> bhm", key_prime)
         attention_normalizer = tf.einsum("blhm,bhm->blh", query_prime, ks_sum)
         attention_normalizer = tf.expand_dims(attention_normalizer, len(attention_normalizer.shape))
+
+        kvs = tf.einsum('bshd, bshe -> bhde', key_prime, value) 
+        attn = tf.einsum('bshd, bhde -> bshe', query_prime, kvs)
 
         return attn / attention_normalizer
 
