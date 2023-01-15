@@ -210,7 +210,7 @@ def val_step(inputs, labels):
   (inp, tar_inp), tar_real, weight = mask_data(inp)
 
   predictions, _ = masked_lm([inp, tar_inp],
-                                training = True)
+                                training = False)
   loss = loss_object(tar_real, predictions, sample_weight=weight[:, 1:]) 
   accuracy = accuracy_function(tar_real, predictions, weight[:, 1:])
 
