@@ -612,6 +612,7 @@ class Attention(tf.keras.layers.Layer):
     linear_trfm_end = time.time()
     Stats.linear_transformation += (linear_trfm_end - linear_trfm_start)
 
+    proj_mat_start = time.time()
     if self.projection_matrix_type is None:
       projection_matrix = None
     else:
@@ -620,6 +621,8 @@ class Attention(tf.keras.layers.Layer):
       seed = tf.dtypes.cast(seed, tf.int32)
       projection_matrix = create_projection_matrix(
           self.nb_random_features, dim, seed=seed)
+    proj_mat_end = time.time()
+    Stats.transformation_time += (proj_mat_end - proj_mat_start)
 
     if cache is not None:
       # Combine cached keys and values with new keys and values.
