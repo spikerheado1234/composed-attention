@@ -90,9 +90,9 @@ def _downsample_mat(mat, rand_mat):
     Returns a down-sampled matrix of size: [B, K, N, H].
     """
 
-    output = tf.einsum('ks, bsnh -> bknh', rand_mat, mat) # Output is of shape: [B, N, K, H] after completing this step.
-    # We then have to return back to the normal shape of: [B, K, N, H]
+    #output = tf.einsum('ks, bsnh -> bknh', rand_mat, mat) # Output is of shape: [B, N, K, H] after completing this step.
 
+    output = tf.einsum('ks, bsd -> bkd', rand_mat, mat) # Output is of shape: [B, N, K, H] after completing this step.
     return output
 
 def _downsampling_shape_correct(mat_shape, rand_mat_shape):
@@ -585,17 +585,6 @@ class MultiHeadAttention(Layer):
         elif value_is_ragged:
             value = value.to_tensor(shape=tf.shape(key))
 
-        #   N = `num_attention_heads`
-        #   H = `size_per_head`
-        # `query` = [B, T, N ,H]
-        query = self._query_dense(query)
-
-        # `key` = [B, S, N, H]
-        key = self._key_dense(key)
-
-        # `value` = [B, S, N, H]
-        value = self._value_dense(value)
-
         #downsampling_time_start = tf.timestamp()
         # Before we down-sample we check if random matrix sizes are correct, else we re-modify them.
         if not _downsampling_shape_correct(key.shape, self._rand_mat_keys.shape) or not _downsampling_shape_correct(value.shape, self._rand_mat_values.shape):
@@ -608,6 +597,18 @@ class MultiHeadAttention(Layer):
         value = _downsample_mat(value, self._rand_mat_values)
         #downsampling_time_end = tf.timestamp()
         #Stats.downsampling_time += (downsampling_time_end - downsampling_time_start)
+
+        #   N = `num_attention_heads`
+        #   H = `size_per_head`
+        # `query` = [B, T, N ,H]
+        query = self._query_dense(query)
+
+        # `key` = [B, S, N, H]
+        key = self._key_dense(key)
+
+        # `value` = [B, S, N, H]
+        value = self._value_dense(value)
+
 
         # Attention_mask is originally: [1, T, S], must change to: [1, T, K] TODO, check if correct.
         attention_mask = attention_mask[:, :, :self._downsample_k]
