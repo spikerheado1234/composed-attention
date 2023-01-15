@@ -268,15 +268,8 @@ def noncausal_numerator(qs, ks, vs):
   Returns:
     Not-normalized FAVOR noncausal attention AV.
   """
-  ## What is this einsum actually doing? TODO, figure out.
-  """
-  Is this einsum equivalent:
-  tf.einsum('blhd, blhd -> blhd')
-  """
   kvs = tf.einsum('bshd, bshe -> bhde', ks, vs) 
   return tf.einsum('bshd, bhde -> bshe', qs, kvs)
-  #kvs = tf.einsum("lbhm,lbhd->bhmd", ks, vs)
-  #return tf.einsum("lbhm,bhmd->lbhd", qs, kvs)
 
 
 def noncausal_denominator(qs, ks):
@@ -287,10 +280,8 @@ def noncausal_denominator(qs, ks):
   Returns:
     FAVOR normalizer in noncausal attention.
   """
-  all_ones = tf.ones([ks.shape[0]])
-  ks_sum = tf.einsum("lbhm,l->bhm", ks, all_ones)
-  return tf.einsum("lbhm,bhm->lbh", qs, ks_sum)
-
+  ks_sum = tf.einsum("blhm -> bhm", ks)
+  return tf.einsum("blhm,bhm->blh", qs, ks_sum)
 
 @tf.custom_gradient
 def causal_numerator(qs, ks, vs):
@@ -409,9 +400,6 @@ def favor_attention(query,
   Stats.transformation_time += (transformation_end - transformation_start)
 
   transpose_time_start = time.time()
-  query_prime = tf.transpose(query_prime, [1, 0, 2, 3])  # [L,B,H,M]
-  key_prime = tf.transpose(key_prime, [1, 0, 2, 3])  # [L,B,H,M]
-  value = tf.transpose(value, [1, 0, 2, 3])  # [L,B,H,D]
   transpose_time_end = time.time()
   Stats.transpose_time += transpose_time_end - transpose_time_start
 
@@ -420,14 +408,12 @@ def favor_attention(query,
     av_attention = causal_numerator(query_prime, key_prime, value)
     attention_normalizer = causal_denominator(query_prime, key_prime)
   else:
-    av_attention = noncausal_numerator(query_prime, key_prime, value)
     attention_normalizer = noncausal_denominator(query_prime, key_prime)
+    av_attention = noncausal_numerator(query_prime, key_prime, value)
   attn_product_end = time.time()
   Stats.q_k_v_product += (attn_product_end - attn_product_start)
   # TODO(kchoro): Add more comments.
   transpose_time_start = time.time()
-  av_attention = tf.transpose(av_attention, [1, 0, 2, 3])
-  attention_normalizer = tf.transpose(attention_normalizer, [1, 0, 2])
   transpose_time_end = time.time()
   Stats.transpose_time += transpose_time_end - transpose_time_start
 
