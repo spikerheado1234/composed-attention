@@ -157,6 +157,7 @@ class MaskedLM(tf.keras.Model):
         # The final linear layer.
         self.final_layer = tf.keras.layers.Dense(target_vocab_size)
 
+    @tf.function
     def call(self, inp):
       output, attention_weights = self.transformer(inp)
 
@@ -280,7 +281,6 @@ for epoch in range(EPOCHS):
     if steps_elapsed % val_iter_freq == 0 and steps_elapsed != 0:
       val_loss.reset_states()
       val_accuracy.reset_states()
-
       for (batch, (inp, tar)) in enumerate(val_batches):
         val_step(inp, tar)
 
