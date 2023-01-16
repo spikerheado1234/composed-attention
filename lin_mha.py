@@ -6,6 +6,7 @@ modify it anyways.
 import collections
 import math
 import string
+import time
 
 import numpy as np
 import tensorflow as tf
@@ -520,15 +521,22 @@ class MultiHeadAttention(Layer):
         # Note: Applying scalar multiply at the smaller end of einsum improves
         # XLA performance, but may introduce slight numeric differences in
         # the Transformer attention head.
+
+        attn_comp_start = time.time()
         query = tf.multiply(query, 1.0 / math.sqrt(float(self._key_dim)))
 
         # Take the dot product between "query" and "key" to get the raw
         # attention scores.
         attention_scores = tf.einsum(self._dot_product_equation, key, query)
+        attn_comp_end = time.time()
+        Stats.q_k_product += (attn_comp_end - attn_comp_start) 
 
+        softmax_time_start = time.time()
         attention_scores = self._masked_softmax(
             attention_scores, attention_mask
         )
+        softmax_time_end = time.time()
+        Stats.softmax += (softmax_time_end - softmax_time_start)
 
         # This is actually dropping out entire tokens to attend to, which might
         # seem a bit unusual, but is taken from the original Transformer paper.
@@ -536,10 +544,13 @@ class MultiHeadAttention(Layer):
             attention_scores, training=training
         )
 
+        last_product_start = time.time()
         # `context_layer` = [B, T, N, H]
         attention_output = tf.einsum(
             self._combine_equation, attention_scores_dropout, value
         )
+        last_product_end = time.time()
+        Stats.a_v_product += (last_product_end - last_product_start)
         return attention_output, attention_scores
 
     def call(
@@ -585,7 +596,7 @@ class MultiHeadAttention(Layer):
         elif value_is_ragged:
             value = value.to_tensor(shape=tf.shape(key))
 
-        #downsampling_time_start = tf.timestamp()
+        downsampling_time_start = time.time()
         # Before we down-sample we check if random matrix sizes are correct, else we re-modify them.
         if not _downsampling_shape_correct(key.shape, self._rand_mat_keys.shape) or not _downsampling_shape_correct(value.shape, self._rand_mat_values.shape):
             self._rand_mat_keys = _build_downsample_proj(self._downsample_k, (self._downsample_k, key.shape[1]))
@@ -595,9 +606,10 @@ class MultiHeadAttention(Layer):
         key = _downsample_mat(key, self._rand_mat_keys)
 
         value = _downsample_mat(value, self._rand_mat_values)
-        #downsampling_time_end = tf.timestamp()
-        #Stats.downsampling_time += (downsampling_time_end - downsampling_time_start)
+        downsampling_time_end = time.time()
+        Stats.downsampling_time += (downsampling_time_end - downsampling_time_start)
 
+        lin_trfr_start = time.time()
         #   N = `num_attention_heads`
         #   H = `size_per_head`
         # `query` = [B, T, N ,H]
@@ -608,17 +620,18 @@ class MultiHeadAttention(Layer):
 
         # `value` = [B, S, N, H]
         value = self._value_dense(value)
-
+        lin_trfr_end = time.time()
+        Stats.linear_transformation += (lin_trfr_end - lin_trfr_start)
 
         # Attention_mask is originally: [1, T, S], must change to: [1, T, K] TODO, check if correct.
         attention_mask = attention_mask[:, :, :self._downsample_k]
         attention_output, attention_scores = self._compute_attention(
             query, key, value, attention_mask, training
         )
-        #local_ffn_start = tf.timestamp()
+        local_ffn_start = time.time()
         attention_output = self._output_dense(attention_output)
-        #local_ffn_end = tf.timestamp()
-        #Stats.ffn_time += (local_ffn_end - local_ffn_start)
+        local_ffn_end = time.time()
+        Stats.ffn_time += (local_ffn_end - local_ffn_start)
 
         if query_is_ragged:
             attention_output = tf.RaggedTensor.from_tensor(

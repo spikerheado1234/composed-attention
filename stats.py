@@ -40,4 +40,11 @@ class Stats:
     downsampling_mat_gen = 0 ## Time taken to generate the random matrix.
 
     downsampling_mat_mul = 0 ## Time taken to for the transformations: E1*K, E2*V.
+
+    ## Linformer Specific attributes.
+    q_k_product = 0 ## Time taken for the product Q*K.
+
+    softmax = 0 ## Time taken for the softmax
+
+    a_v_product = 0 ## Time taken for the product: A*v.
     
