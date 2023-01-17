@@ -284,7 +284,7 @@ for epoch in range(EPOCHS):
       for (batch, (inp, tar)) in enumerate(val_batches):
         val_step(inp, tar)
 
-      with open(f'./{args.attention_type}_val_data.txt', "a+") as f:
+      with open(f'./{args.attention_type}_val_data_{args.lr_rate}.txt', "a+") as f:
         f.write(f'{val_loss.result():.4f} {val_accuracy.result():.4f}\n')
 
   print(f'Epoch {epoch + 1} Loss {train_loss.result():.4f} Accuracy {train_accuracy.result():.4f}', flush=True)
