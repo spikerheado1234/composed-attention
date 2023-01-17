@@ -30,6 +30,7 @@ parser.add_argument('--encoder_only', dest='enc_only', action='store_true', help
 parser.add_argument('--warmup', dest='warmup', default=10000, type=int, help='The number of warmup steps required during pre-training.')
 parser.add_argument('--task', dest='task', default="cola", type=str, help='The GLUE task to fine-tune on.')
 parser.add_argument('--learning_rate', dest='lr_rate', type=float, default=0.0002, help='the largest constant in the lr schedule.')
+parser.add_argument('--pre-train-data', dest='pt_data', type=str, default="wiki-text", help=' the pre-train dataset we are taking the best checkpoint of.')
 
 args = parser.parse_args()
 
@@ -335,7 +336,7 @@ optimizer = tf.keras.optimizers.Adam(warmup_schedule, beta_1=0.9, beta_2=0.999, 
 train_loss = tf.keras.metrics.Mean(name='train_loss')
 train_accuracy = tf.keras.metrics.Mean(name='train_accuracy')
 
-checkpoint_path = './checkpoints/train/' + str(args.attention_type) + '/' + str(initial_learning_rate) + '/' + str(args.warmup)
+checkpoint_path = './checkpoints/train/' + str(args.attention_type) + '/' + str(args.pt_data) + '/' + str(initial_learning_rate) + '/' + str(args.warmup)
 
 ckpt = tf.train.Checkpoint(step=tf.Variable(1),
                            transformer=transformer,
