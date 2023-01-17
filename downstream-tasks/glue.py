@@ -62,7 +62,6 @@ accuracy_function = None
 def prepare_transformer_input(enc_part, dec_part):
     global MAX_TOKENS
 
-    pdb.set_trace()
     enc_part = enc_part[:, :MAX_TOKENS]
     enc_part = pad(enc_part, MAX_TOKENS)
     enc_part = enc_part[:, :-2]
@@ -80,7 +79,6 @@ def prepare_transformer_input(enc_part, dec_part):
     real_dec_part = real_dec_part[:, :-1] ## We then remove the end token.
     
     dec_part = add_start_end(dec_part)
-    #real_dec_part = dec_part[:, :-1] After testing finishes, remove this.
     output_comparison = dec_part[:, 1:]
     ones = np.ones(shape=(output_comparison.shape))
     zeros = np.zeros(shape=(output_comparison.shape))
@@ -89,21 +87,21 @@ def prepare_transformer_input(enc_part, dec_part):
     return enc_part, real_dec_part, output_comparison, weights
 
 def compute_accuracy(real, pred, weights):
-    if args.task == "cola" or args.task == "sst2" or args.task == "mrpc" or args.task == "qqp" or args.task == "mnli" or args.task == "qnli" or args.task == "rte" or args.task == "wnli":
+    if args.task == "cola" or args.task == "sst2" or args.task == "mrpc" or args.task == "qqp" or args.task == "mnli" or args.task == "qnli" or args.task == "rte" or args.task == "wnli" args.task == "stsb":
         accuracies = tf.math.equal(real, tf.math.argmax(pred, axis=-1))
         mask = tf.math.equal(weights, tf.ones(shape=weights.shape, dtype=tf.int64))
         accuracies &= mask
         accuracies = tf.cast(accuracies, dtype=tf.float32)
         return tf.reduce_sum(accuracies) / tf.reduce_sum(tf.cast(weights, dtype=tf.float32))
-    elif args.task == "stsb":
-        accuracies = tf.math.equal(real, tf.math.argmax(pred, axis=-1))
-        mask = tf.math.equal(weights, tf.ones(shape=weights.shape, dtype=tf.int64))
-        accuracies &= mask
-        accuracies = tf.cast(accuracies, dtype=tf.float32)
-        ## Over here, for stsb we have a floating of the x.y. 
-        row_sum = tf.cast(tf.reduce_sum(accuracies, axis=-1), dtype=tf.int32)
-        cnts = tf.math.bincount(row_sum)
-        return tf.cast(cnts[3] if cnts.shape[0] >= 3 else tf.convert_to_tensor(0), dtype=tf.float32) / tf.convert_to_tensor(pred.shape[0], dtype=tf.float32)
+    #elif args.task == "stsb":
+    #    accuracies = tf.math.equal(real, tf.math.argmax(pred, axis=-1))
+    #    mask = tf.math.equal(weights, tf.ones(shape=weights.shape, dtype=tf.int64))
+    #    accuracies &= mask
+    #    accuracies = tf.cast(accuracies, dtype=tf.float32)
+    #    ## Over here, for stsb we have a floating of the x.y. 
+    #    row_sum = tf.cast(tf.reduce_sum(accuracies, axis=-1), dtype=tf.int32)
+    #    cnts = tf.math.bincount(row_sum)
+    #    return tf.cast(cnts[3] if cnts.shape[0] >= 3 else tf.convert_to_tensor(0), dtype=tf.float32) / tf.convert_to_tensor(pred.shape[0], dtype=tf.float32)
 
 ## COLA HELPER METHODS. ##
 def prepare_cola(inp):
@@ -181,8 +179,7 @@ def prepare_stsb(inp):
     sentence_two = prefix_two + sentence_two
     enc_input = tf.convert_to_tensor(sentence_one.numpy() + sentence_two.numpy())
     enc_input = en_tokenizer.tokenize(enc_input)
-    multiplier = tf.constant(10, dtype=tf.float32)
-    label = tf.round(label * multiplier) / multiplier ## Rounds to One DP.
+    label = tf.cast(tf.math.round(label), dtype=tf.int64) ## We cast this simple classification by rounding to nearest integer.
     label = en_tokenizer.tokenize(tf.convert_to_tensor(label.numpy().astype('S')))
     
     return enc_input.merge_dims(-2, -1).to_tensor(), label.merge_dims(-2, -1).to_tensor()
@@ -404,7 +401,8 @@ def val_step(inp):
   train_accuracy(accuracy)
 
 def train_step(inp):
-  
+
+  pdb.set_trace()
   enc_part, dec_part = prepare_helper(inp)
   enc_part, dec_part, real_val, weights = prepare_transformer_input(enc_part, dec_part)
 
@@ -423,6 +421,10 @@ def train_step(inp):
 
 EPOCHS = 3
 
+## We write everything to one file.
+with open(f'{args.attention_type}_val_data_glue.txt', "a+") as f:
+    f.write(f"--------{args.task}--------\n")
+
 train_start = time.time()
 for epoch in range(EPOCHS):
   start = time.time()
@@ -440,7 +442,7 @@ for epoch in range(EPOCHS):
     val_step(inp)
 
   ## We write to file the validation information.
-  with open(f'{args.attention_type}_val_data_glue_{args.task}.txt', "a+") as f:
+  with open(f'{args.attention_type}_val_data_glue.txt', "a+") as f:
     f.write(f'{train_loss.result():.4f} {train_accuracy.result():.4f}\n')
 
   print(f'Epoch {epoch + 1} Loss {train_loss.result():.4f} Accuracy {train_accuracy.result():.4f}', flush=True)
