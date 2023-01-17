@@ -51,6 +51,7 @@ def prepare_batch(inps, labels):
     global en_tokenizer
     ## Take special care to tokenize ONLY the inps. ##
     inps_tok = en_tokenizer.tokenize(inps)
+    labels = en_tokenizer.tokenize(labels)
 
     return inps_tok, labels
 
@@ -65,6 +66,7 @@ def make_batches(ds, BUFFER_SIZE, BATCH_SIZE):
 
 ## Basic tokenized dataset that is batched accordingly. ##
 train_batches = make_batches(train_data, BUFFER_SIZE, BATCH_SIZE)
+val_batches = make_batches(val_data, BUFFER_SIZE, BATCH_SIZE)
 
 ## We define our transformer here. ##
 num_layers = args.layers
@@ -160,7 +162,6 @@ class DownstreamModel(tf.keras.Model):
 ## Instantiate our new model over here. ##
 downstream_model = DownstreamModel(transformer)
 
-## TODO, check for correctness. ##
 def pad_data(inp_tok, review):
   global MAX_TOKENS 
   """
@@ -168,9 +169,11 @@ def pad_data(inp_tok, review):
   sequence length is standardized to MAX_TOKENS.
   """
   inp = inp_tok.merge_dims(-2, -1).to_tensor()
+  review = review.merge_dims(-2, -1).to_tensor()
 
   inp = inp[:, :MAX_TOKENS]
   inp = pad(inp, MAX_TOKENS)
+  review = pad(review, MAX_TOKENS)
 
   ## Then we drop the last two tokens and add the start and last token.
   inp = inp[:, :-2]
@@ -178,12 +181,30 @@ def pad_data(inp_tok, review):
   ## Now the inp will be fed into the encoder. ##
 
   ## first resize the reviews. ##
-  review = tf.reshape(review, [review.shape[0], 1])
+  review = review[:, :-2]
+  tar_inp = tf.zeros(shape=review.shape, dtype=tf.int64)
+  tar_inp = add_start_end(tar_inp)
+  tar_inp = tar_inp[:, :-1]
   review = add_start_end(review)
-  tar_inp = review[:, :-1] ## Remove the end token for the review. Will be fed into the decoder.
+
+  review = add_start_end(review)
   tar_real = review[:, 1:] ## Remove the start token for the comparison of the reivew. 
 
-  return (inp, tar_inp), tar_real[:, :-1] ## Also remove the last token from tar_real.
+  return (inp, tar_inp), tar_real 
+
+def val_step(inputs, labels):
+
+  pdb.set_trace()
+  (inp, tar_inp), tar_real = pad_data(inputs, labels)
+
+  predictions, _ = downstream_model([inp, tar_inp],
+                                    training = True)
+  ## we have to recast the predictions. 
+  loss = loss_object(tar_real, predictions) 
+  accuracy = accuracy_function(tar_real, predictions)
+
+  train_loss.update_state(loss)
+  train_accuracy(accuracy)
 
 def train_step(inputs, labels):
 
@@ -202,7 +223,6 @@ def train_step(inputs, labels):
   train_loss.update_state(loss)
   train_accuracy(accuracy)
 
-
 EPOCHS = 30
 total_steps_required = args.num_steps
 
@@ -211,29 +231,15 @@ steps_elapsed = 0
 train_start = time.time()
 for epoch in range(EPOCHS):
   start = time.time()
-  if steps_elapsed > total_steps_required:
-    break
 
   train_loss.reset_states()
   train_accuracy.reset_states()
 
   for (batch, (inp, tar)) in enumerate(train_batches):
-    if steps_elapsed > total_steps_required:
-      break
     train_step(inp, tar)
-    if (steps_elapsed % 1000 == 0):
-      # We print end-to-end time here just in case.
-      print(f'----------- End-to-End: {time.time() - train_start} -----------')
 
-    print(f'Steps {steps_elapsed} Epoch {epoch + 1} Batch {batch} Loss {train_loss.result():.4f} Accuracy {train_accuracy.result():.4f}', flush=True)
-
-    with open(f'./train_data_{args.attention_type}_{args.rank}.txt', 'a+') as f:
-      f.write(f'{steps_elapsed} {train_loss.result():.4f} {train_accuracy.result():.4f}\n')
-
-    with open(f'./train_stats_{args.attention_type}_{args.rank}.txt', 'a+') as f:
-        f.write(f'{steps_elapsed} MHA {Stats.mha_time:.4f} MHA-Enc {Stats.mha_enc_time:.4f} MHA-Causal {Stats.mha_causal_time:.4f} MHA-Enc-Dec {Stats.mha_enc_dec_time:.4f} FFN {Stats.ffn_time:.4f} Downsampling {Stats.downsampling_time:.4f} Kernel-Transformation {Stats.transformation_time:.4f}\n')
-
-    steps_elapsed += 1
+  for (batch, (inp, tar)) in enumerate(val_batches):
+    val_step(inp, tar)
 
   print(f'Epoch {epoch + 1} Loss {train_loss.result():.4f} Accuracy {train_accuracy.result():.4f}', flush=True)
 
