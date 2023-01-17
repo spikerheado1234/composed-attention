@@ -10,7 +10,6 @@ import tensorflow_datasets as tfds
 import argparse
 import time
 import numpy as np
-import pdb
 
 from pre_train_wiki_loader import en_tokenizer
 from stats import Stats 
@@ -87,21 +86,11 @@ def prepare_transformer_input(enc_part, dec_part):
     return enc_part, real_dec_part, output_comparison, weights
 
 def compute_accuracy(real, pred, weights):
-    if args.task == "cola" or args.task == "sst2" or args.task == "mrpc" or args.task == "qqp" or args.task == "mnli" or args.task == "qnli" or args.task == "rte" or args.task == "wnli" or args.task == "stsb":
-        accuracies = tf.math.equal(real, tf.math.argmax(pred, axis=-1))
-        mask = tf.math.equal(weights, tf.ones(shape=weights.shape, dtype=tf.int64))
-        accuracies &= mask
-        accuracies = tf.cast(accuracies, dtype=tf.float32)
-        return tf.reduce_sum(accuracies) / tf.reduce_sum(tf.cast(weights, dtype=tf.float32))
-    #elif args.task == "stsb":
-    #    accuracies = tf.math.equal(real, tf.math.argmax(pred, axis=-1))
-    #    mask = tf.math.equal(weights, tf.ones(shape=weights.shape, dtype=tf.int64))
-    #    accuracies &= mask
-    #    accuracies = tf.cast(accuracies, dtype=tf.float32)
-    #    ## Over here, for stsb we have a floating of the x.y. 
-    #    row_sum = tf.cast(tf.reduce_sum(accuracies, axis=-1), dtype=tf.int32)
-    #    cnts = tf.math.bincount(row_sum)
-    #    return tf.cast(cnts[3] if cnts.shape[0] >= 3 else tf.convert_to_tensor(0), dtype=tf.float32) / tf.convert_to_tensor(pred.shape[0], dtype=tf.float32)
+    accuracies = tf.math.equal(real, tf.math.argmax(pred, axis=-1))
+    mask = tf.math.equal(weights, tf.ones(shape=weights.shape, dtype=tf.int64))
+    accuracies &= mask
+    accuracies = tf.cast(accuracies, dtype=tf.float32)
+    return tf.reduce_sum(accuracies) / tf.reduce_sum(tf.cast(weights, dtype=tf.float32))
 
 ## COLA HELPER METHODS. ##
 def prepare_cola(inp):
@@ -163,7 +152,6 @@ def prepare_qqp(inp):
     label = en_tokenizer.tokenize(tf.convert_to_tensor(label.numpy().astype('S')))
     
     return enc_input.merge_dims(-2, -1).to_tensor(), label.merge_dims(-2, -1).to_tensor()
-
 
 ## STSB HELPER METHODS. ##
 def prepare_stsb(inp):
@@ -402,7 +390,6 @@ def val_step(inp):
 
 def train_step(inp):
 
-  pdb.set_trace()
   enc_part, dec_part = prepare_helper(inp)
   enc_part, dec_part, real_val, weights = prepare_transformer_input(enc_part, dec_part)
 
