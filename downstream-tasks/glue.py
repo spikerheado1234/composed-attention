@@ -87,7 +87,7 @@ def prepare_transformer_input(enc_part, dec_part):
     return enc_part, real_dec_part, output_comparison, weights
 
 def compute_accuracy(real, pred, weights):
-    if args.task == "cola" or args.task == "sst2" or args.task == "mrpc" or args.task == "qqp" or args.task == "mnli" or args.task == "qnli" or args.task == "rte" or args.task == "wnli" args.task == "stsb":
+    if args.task == "cola" or args.task == "sst2" or args.task == "mrpc" or args.task == "qqp" or args.task == "mnli" or args.task == "qnli" or args.task == "rte" or args.task == "wnli" or args.task == "stsb":
         accuracies = tf.math.equal(real, tf.math.argmax(pred, axis=-1))
         mask = tf.math.equal(weights, tf.ones(shape=weights.shape, dtype=tf.int64))
         accuracies &= mask
