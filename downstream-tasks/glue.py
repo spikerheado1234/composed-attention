@@ -10,6 +10,7 @@ import tensorflow_datasets as tfds
 import argparse
 import time
 import numpy as np
+import pdb
 
 from pre_train_wiki_loader import en_tokenizer
 from stats import Stats 
@@ -61,6 +62,7 @@ accuracy_function = None
 def prepare_transformer_input(enc_part, dec_part):
     global MAX_TOKENS
 
+    pdb.set_trace()
     enc_part = enc_part[:, :MAX_TOKENS]
     enc_part = pad(enc_part, MAX_TOKENS)
     enc_part = enc_part[:, :-2]
@@ -70,9 +72,15 @@ def prepare_transformer_input(enc_part, dec_part):
     ## This is the part that is added, may impact accuracy deliteriously.##
     dec_part = pad(dec_part, MAX_TOKENS)
     dec_part = dec_part[:, :-2]
+    ## Over here, to prevent any causal leakage, we do NOT feed in the input into the decoder.
+    ## First, we create a tensor of all zeros.
+    real_dec_part = tf.zeros(shape=dec_part.shape, dtype=tf.int64)
+    ## We prepend the start token and append the end token.
+    real_dec_part = add_start_end(real_dec_part)
+    real_dec_part = real_dec_part[:, :-1] ## We then remove the end token.
     
     dec_part = add_start_end(dec_part)
-    real_dec_part = dec_part[:, :-1]
+    #real_dec_part = dec_part[:, :-1] After testing finishes, remove this.
     output_comparison = dec_part[:, 1:]
     ones = np.ones(shape=(output_comparison.shape))
     zeros = np.zeros(shape=(output_comparison.shape))
