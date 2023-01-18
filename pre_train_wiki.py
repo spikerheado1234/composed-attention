@@ -187,28 +187,15 @@ def mask_data(inp_tok):
 
   return (inp, tar_inp), tar_real, sample_weights
 
-distribution = [0, 0, 0, 0] # 0, 0 < 10, 10 -50, > 50 -> gives number of NON-0 elements excluding start and end token.
-
-def compute_distribution(inp):
-  global distribution
-
-  count = tf.reduce_sum(tf.cast(tf.math.logical_not(tf.equal(tf.convert_to_tensor(inp.numpy()[:, :-1]), 0)), dtype=tf.int64))
-
-  if count == 0:
-    distribution[0] += 1
-  elif 0 < count < 10:
-    distribution[1] += 1
-  elif 10 <= count < 50:
-    distribution[2] += 1
-  else:
-    distribution[3] += 1
-
 def val_step(inputs, labels):
 
   (inp, tar_inp) = inputs
   tar_real = labels
 
   (inp, tar_inp), tar_real, weight = mask_data(inp)
+
+  if args.encoder_only:
+    inp = inp[:, 1:]
 
   predictions, _ = masked_lm([inp, tar_inp],
                                 training = False)
@@ -225,7 +212,9 @@ def train_step(inputs, labels):
 
   (inp, tar_inp), tar_real, weight = mask_data(inp)
 
-  compute_distribution(tar_real)
+  # We must drop the start token if we train in the encoder only regime.
+  if args.encoder_only:
+    inp = inp[:, 1:]
 
   with tf.GradientTape() as tape:
     predictions, _ = masked_lm([inp, tar_inp],
