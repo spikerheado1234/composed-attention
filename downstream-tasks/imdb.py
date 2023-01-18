@@ -209,7 +209,7 @@ def val_step(inputs, labels):
   accuracy = accuracy_function(tar_real, predictions, weights)
 
   train_loss.update_state(loss)
-  train_accuracy(accuracy)
+  train_accuracy.update_state(accuracy)
 
 def train_step(inputs, labels):
 
@@ -226,9 +226,9 @@ def train_step(inputs, labels):
   optimizer.apply_gradients(zip(gradients, downstream_model.trainable_variables))
 
   train_loss.update_state(loss)
-  train_accuracy(accuracy)
+  train_accuracy.update_state(accuracy)
 
-EPOCHS = 10
+EPOCHS = 30
 total_steps_required = args.num_steps
 
 steps_elapsed = 0
@@ -245,6 +245,9 @@ for epoch in range(EPOCHS):
   train_accuracy.reset_states()
   for (batch, (inp, tar)) in enumerate(val_batches):
     val_step(inp, tar)
+
+  with open(f"{args.attention_type}_val_data_imdb.txt", "a+") as f:
+    f.write(f"{train_loss.result():.4f} {train_accuracy.result():.4f}\n")
 
   print(f'Epoch {epoch + 1} Loss {train_loss.result():.4f} Accuracy {train_accuracy.result():.4f}', flush=True)
 
