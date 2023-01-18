@@ -101,12 +101,9 @@ class RaceLoader:
         questions_np = questions.numpy()[:, :1][0] ## Grab the first question.
         answers_np = answers.numpy()[:, :1][0] ## Grab the first answer.
         options_np = options.numpy()[:, :1][0][0] ## Grab the list of the first options.
-        enc_str = article_np[0] + b' [CLASS] ' + questions_np[0] + b' [CLASS] '
+        enc_str = b'race article: ' + article_np[0] + b' question: ' + questions_np[0] 
         for idx, opt in enumerate(options_np):
-            if idx == len(options_np) - 1: ## This is the last concat we are doing.
-                enc_str += opt
-            else:
-                enc_str += opt + b' [SEP] '
+          enc_str += opt + b' option ' + bytes(str(idx+1), 'ascii') + ': '
         ## We return a tensor of: concat(article, [SEP], question)
         ## alognside the answer
         dec_str = answers_np[0]
