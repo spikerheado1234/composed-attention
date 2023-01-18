@@ -29,6 +29,8 @@ parser.add_argument('--step_count', dest='num_steps', type=int, default=500000, 
 parser.add_argument('--rank', dest='rank', type=int, default=1, help='The rank of the process, to distinguish output.')
 parser.add_argument('--encoder_only', dest='enc_only', action='store_true', help='Whether we are training in encoder only mode')
 parser.add_argument('--warmup', dest='warmup', default=10000, type=int, help='The number of warmup steps required during pre-training.')
+parser.add_argument('--learning_rate', dest='lr_rate', type=float, default=2e-05, help='the largest constant in the lr schedule.')
+parser.add_argument('--pre-train-data', dest='pt_data', type=str, default="wiki-text", help=' the pre-train dataset we are taking the best checkpoint of.')
 
 args = parser.parse_args()
 
@@ -156,7 +158,7 @@ transformer = Transformer(
     encoder_only=args.enc_only)
 
 ## Then, we create the learning rate schedule. ##
-initial_learning_rate = 0.0001
+initial_learning_rate = args.lr_rate
 num_train_steps = args.num_steps
 warmup_steps = args.warmup
 linear_decay = tf.keras.optimizers.schedules.PolynomialDecay(
@@ -187,7 +189,7 @@ def accuracy_function(real, pred):
 train_loss = tf.keras.metrics.Mean(name='train_loss')
 train_accuracy = tf.keras.metrics.Mean(name='train_accuracy')
 
-checkpoint_path = './checkpoints/train/' + str(args.attention_type) + '/' + str(initial_learning_rate) + '/' + str(args.warmup)
+checkpoint_path = './checkpoints/train/' + str(args.attention_type) + '/' + str(args.pt_data) + '/' + str(initial_learning_rate) + '/' + str(args.warmup)
 
 ckpt = tf.train.Checkpoint(step=tf.Variable(1),
                            transformer=transformer,
