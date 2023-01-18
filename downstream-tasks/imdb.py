@@ -115,7 +115,7 @@ loss_object = tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True, re
 
 def accuracy_function(real, pred, weights):
   ## We delete whatever corresponds to the [END] token over here. 
-  accuracies = tf.math.equal(real, pred)
+  accuracies = tf.math.equal(real, tf.math.argmax(pred, axis=-1))
   mask = tf.cast(weights, dtype=tf.bool)
   accuracies &= mask
   accuracies = tf.cast(accuracies, dtype=tf.float32)
