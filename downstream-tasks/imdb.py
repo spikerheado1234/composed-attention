@@ -54,7 +54,6 @@ def prepare_batch(inps, labels):
     global en_tokenizer
     ## Take special care to tokenize ONLY the inps. ##
     inps_tok = en_tokenizer.tokenize(inps)
-    labels = en_tokenizer.tokenize(tf.convert_to_tensor(labels.numpy().astype('S')))
 
     return inps_tok, labels
 
@@ -165,12 +164,13 @@ class DownstreamModel(tf.keras.Model):
 downstream_model = DownstreamModel(transformer, Constants.wiki_vocab_size)
 
 def pad_data(inp_tok, review):
-  global MAX_TOKENS 
+  global MAX_TOKENS, en_tokenizer
   """
   Pads the vector inputs (of size (BATCH_SIZE, SEQUENCE LENGTH)) to ensure each
   sequence length is standardized to MAX_TOKENS.
   """
   inp = inp_tok.merge_dims(-2, -1).to_tensor()
+  review = en_tokenizer.tokenize(tf.convert_to_tensor(review.numpy().astype('S')))
   review = review.merge_dims(-2, -1).to_tensor()
 
   inp = inp[:, :MAX_TOKENS]
@@ -205,7 +205,7 @@ def val_step(inputs, labels):
   predictions = downstream_model([inp, tar_inp],
                                   training = False)
   ## we have to recast the predictions. 
-  loss = loss_object(tar_real, predictions, sample_weights=weights) 
+  loss = loss_object(tar_real, predictions, sample_weight=weights) 
   accuracy = accuracy_function(tar_real, predictions, weights)
 
   train_loss.update_state(loss)
@@ -219,7 +219,7 @@ def train_step(inputs, labels):
     predictions = downstream_model([inp, tar_inp],
                                     training = True)
     ## we have to recast the predictions. 
-    loss = loss_object(tar_real, predictions, sample_weights=weights) 
+    loss = loss_object(tar_real, predictions, sample_weight=weights) 
     accuracy = accuracy_function(tar_real, predictions, weights)
 
   gradients = tape.gradient(loss, downstream_model.trainable_variables)
