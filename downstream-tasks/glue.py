@@ -318,7 +318,7 @@ transformer = Transformer(
     encoder_only=args.enc_only)
 
 ## Then, we create the learning rate schedule. ##
-initial_learning_rate = 2e-05
+initial_learning_rate = args.lr_rate
 num_train_steps = args.num_steps
 warmup_steps = args.warmup
 linear_decay = tf.keras.optimizers.schedules.PolynomialDecay(
@@ -336,7 +336,7 @@ optimizer = tf.keras.optimizers.Adam(warmup_schedule, beta_1=0.9, beta_2=0.999, 
 train_loss = tf.keras.metrics.Mean(name='train_loss')
 train_accuracy = tf.keras.metrics.Mean(name='train_accuracy')
 
-checkpoint_path = './checkpoints/train/' + str(args.attention_type) + '/' + str(args.pt_data) + '/' + str(initial_learning_rate) + '/' + str(args.warmup)
+checkpoint_path = './checkpoints/train/' + str(args.attention_type) + '/' + str(args.pt_data) + '/' + str(args.lr_rate) + '/' + str(args.warmup)
 
 ckpt = tf.train.Checkpoint(step=tf.Variable(1),
                            transformer=transformer,
