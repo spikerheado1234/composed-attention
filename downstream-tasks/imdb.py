@@ -54,7 +54,7 @@ def prepare_batch(inps, labels):
     global en_tokenizer
     ## Take special care to tokenize ONLY the inps. ##
     inps_tok = en_tokenizer.tokenize(inps)
-    labels = en_tokenizer.tokenize(labels)
+    labels = en_tokenizer.tokenize(tf.convert_to_tensor(labels.numpy().astype('S')))
 
     return inps_tok, labels
 
