@@ -387,7 +387,7 @@ def val_step(inp):
   accuracy = compute_accuracy(real_val, predictions, weights)
 
   train_loss.update_state(loss)
-  train_accuracy(accuracy)
+  train_accuracy.update_state(accuracy)
 
 def train_step(inp):
 
@@ -405,7 +405,7 @@ def train_step(inp):
   optimizer.apply_gradients(zip(gradients, downstream_model.trainable_variables))
 
   train_loss.update_state(loss)
-  train_accuracy(accuracy)
+  train_accuracy.update_state(accuracy)
 
 EPOCHS = 3
 
