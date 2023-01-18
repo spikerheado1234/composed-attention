@@ -222,11 +222,10 @@ def train_step(inputs, labels):
   train_loss.update_state(loss)
   train_accuracy(accuracy)
 
-EPOCHS = 30
+EPOCHS = 10
 total_steps_required = args.num_steps
 
 steps_elapsed = 0
-
 train_start = time.time()
 for epoch in range(EPOCHS):
   start = time.time()
@@ -244,7 +243,6 @@ for epoch in range(EPOCHS):
   print(f'Epoch {epoch + 1} Loss {train_loss.result():.4f} Accuracy {train_accuracy.result():.4f}', flush=True)
 
   print(f'Time taken for 1 epoch: {time.time() - start:.2f} secs\n', flush=True)
-
 
 train_end = time.time()
 
