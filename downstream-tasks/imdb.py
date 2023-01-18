@@ -238,7 +238,6 @@ for epoch in range(EPOCHS):
 
   train_loss.reset_states()
   train_accuracy.reset_states()
-  pdb.set_trace()
   for (batch, (inp, tar)) in enumerate(train_batches):
     train_step(inp, tar)
 
