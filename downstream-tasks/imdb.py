@@ -10,6 +10,7 @@ import tensorflow_datasets as tfds
 import argparse
 import time
 import pdb ## For debugging only, TODO remove.
+import numpy as np
 
 from pre_train_wiki_loader import en_tokenizer
 from stats import Stats 
@@ -28,6 +29,8 @@ parser.add_argument('--step_count', dest='num_steps', type=int, default=500000, 
 parser.add_argument('--rank', dest='rank', type=int, default=1, help='The rank of the process, to distinguish output.')
 parser.add_argument('--encoder_only', dest='enc_only', action='store_true', help='Whether we are training in encoder only mode')
 parser.add_argument('--warmup', dest='warmup', default=10000, type=int, help='The number of warmup steps required during pre-training.')
+parser.add_argument('--learning_rate', dest='lr_rate', type=float, default=2e-05, help='the largest constant in the lr schedule.')
+parser.add_argument('--pre-train-data', dest='pt_data', type=str, default="wiki-text", help=' the pre-train dataset we are taking the best checkpoint of.')
 
 args = parser.parse_args()
 
@@ -107,21 +110,22 @@ optimizer = tf.keras.optimizers.Adam(warmup_schedule, beta_1=0.9, beta_2=0.999,
                                     epsilon=1e-9)
 
 ## We create our loss function. ##
-loss_object = tf.keras.losses.BinaryCrossentropy(from_logits=False, reduction='none')
+loss_object = tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True, reduction='none')
 
 ## Next, we create helper methods to compute accuracy and loss. ##
 
-## TODO, come back to this later. ## TODO, sanity check this.
-def accuracy_function(real, pred):
+def accuracy_function(real, pred, weights):
   ## We delete whatever corresponds to the [END] token over here. 
-  accuracies = tf.math.equal(tf.cast(real, dtype=tf.int64), tf.cast(tf.round(pred), dtype=tf.int64))
+  accuracies = tf.math.equal(real, pred)
+  mask = tf.cast(weights, dtype=tf.bool)
+  accuracies &= mask
   accuracies = tf.cast(accuracies, dtype=tf.float32)
-  return tf.reduce_sum(accuracies) / tf.reduce_sum(tf.ones(shape=real.shape, dtype=tf.float32)) ## Divide by batch * seq to get accuracy over everything.
+  return tf.reduce_sum(accuracies) / tf.cast(tf.reduce_sum(weights), dtype=tf.float32)
   
 train_loss = tf.keras.metrics.Mean(name='train_loss')
 train_accuracy = tf.keras.metrics.Mean(name='train_accuracy')
 
-checkpoint_path = './checkpoints/train/' + str(args.attention_type) + '/' + str(initial_learning_rate) + '/' + str(args.warmup)
+checkpoint_path = './checkpoints/train/' + str(args.attention_type) + '/' +  str(args.pt_data) + '/' + str(initial_learning_rate) + '/' + str(args.warmup)
 
 ckpt = tf.train.Checkpoint(step=tf.Variable(1),
                            transformer=transformer,
@@ -145,22 +149,20 @@ train_step_signature = [
 
 ## Then, we create a new model to finetune. ##
 class DownstreamModel(tf.keras.Model):
-  def __init__(self, transformer):
+  def __init__(self, transformer, vocabulary_size):
     super(DownstreamModel, self).__init__()
     self.transformer = transformer
 
     ## We create more interim dense layers as well. ##
-    self.layer_one = tf.keras.layers.Dense(64, activation=tf.keras.activations.relu) ## A hyperparameter that we will tune later.
-    self.layer_two = tf.keras.layers.Dense(1, activation=tf.keras.activations.sigmoid)
+    self.head = tf.keras.layers.Dense(vocabulary_size, activation=tf.keras.activations.relu)
 
   def call(self, inp): ## Keras requires only one input, so we pass in a list.
     out , _ = self.transformer(inp)
-    out = self.layer_one(out)
-    out = self.layer_two(out)
+    out = self.head(out)
     return out
 
 ## Instantiate our new model over here. ##
-downstream_model = DownstreamModel(transformer)
+downstream_model = DownstreamModel(transformer, Constants.wiki_vocab_size)
 
 def pad_data(inp_tok, review):
   global MAX_TOKENS 
@@ -187,34 +189,38 @@ def pad_data(inp_tok, review):
   tar_inp = tar_inp[:, :-1]
   review = add_start_end(review)
 
-  review = add_start_end(review)
   tar_real = review[:, 1:] ## Remove the start token for the comparison of the reivew. 
+  
+  ## Weights computation.
+  ones = np.ones(shape=tar_real.shape)
+  zeros = np.zeros(shape=tar_real.shape)
+  weights = tf.convert_to_tensor(np.where(tar_real.numpy() > 5, ones, zeros), dtype=tf.int64)
 
-  return (inp, tar_inp), tar_real 
+  return (inp, tar_inp), tar_real, weights
 
 def val_step(inputs, labels):
 
-  (inp, tar_inp), tar_real = pad_data(inputs, labels)
+  (inp, tar_inp), tar_real, weights = pad_data(inputs, labels)
 
-  predictions, _ = downstream_model([inp, tar_inp],
-                                    training = True)
+  predictions = downstream_model([inp, tar_inp],
+                                  training = False)
   ## we have to recast the predictions. 
-  loss = loss_object(tar_real, predictions) 
-  accuracy = accuracy_function(tar_real, predictions)
+  loss = loss_object(tar_real, predictions, sample_weights=weights) 
+  accuracy = accuracy_function(tar_real, predictions, weights)
 
   train_loss.update_state(loss)
   train_accuracy(accuracy)
 
 def train_step(inputs, labels):
 
-  (inp, tar_inp), tar_real = pad_data(inputs, labels)
+  (inp, tar_inp), tar_real, weights = pad_data(inputs, labels)
 
   with tf.GradientTape() as tape:
-    predictions, _ = downstream_model([inp, tar_inp],
-                                      training = True)
+    predictions = downstream_model([inp, tar_inp],
+                                    training = True)
     ## we have to recast the predictions. 
-    loss = loss_object(tar_real, predictions) 
-    accuracy = accuracy_function(tar_real, predictions)
+    loss = loss_object(tar_real, predictions, sample_weights=weights) 
+    accuracy = accuracy_function(tar_real, predictions, weights)
 
   gradients = tape.gradient(loss, downstream_model.trainable_variables)
   optimizer.apply_gradients(zip(gradients, downstream_model.trainable_variables))
@@ -233,11 +239,12 @@ for epoch in range(EPOCHS):
 
   train_loss.reset_states()
   train_accuracy.reset_states()
-
   pdb.set_trace()
   for (batch, (inp, tar)) in enumerate(train_batches):
     train_step(inp, tar)
 
+  train_loss.reset_states()
+  train_accuracy.reset_states()
   for (batch, (inp, tar)) in enumerate(val_batches):
     val_step(inp, tar)
 
