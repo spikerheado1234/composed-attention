@@ -92,7 +92,7 @@ transformer = Transformer(
     encoder_only=args.enc_only)
 
 ## Then, we create the learning rate schedule. ##
-initial_learning_rate = 0.0001
+initial_learning_rate = args.lr_rate
 num_train_steps = args.num_steps
 warmup_steps = args.warmup
 linear_decay = tf.keras.optimizers.schedules.PolynomialDecay(
