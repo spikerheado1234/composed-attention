@@ -222,8 +222,6 @@ def train_step(inputs, labels):
                                  training = True)
     loss = loss_object(tar_real, predictions, sample_weight=weight[:, 1:]) 
     accuracy = accuracy_function(tar_real, predictions, weight[:, 1:])
-  pdb.set_trace()
-  print(masked_lm.summary())
 
   gradients = tape.gradient(loss, transformer.trainable_variables)
   optimizer.apply_gradients(zip(gradients, transformer.trainable_variables))
