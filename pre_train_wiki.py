@@ -11,6 +11,7 @@ from constants import Constants
 from tokenization_proc import mask
 import tensorflow_models as tfm
 import numpy as np
+import pdb
 
 ## Define argument parsing and help over here. ##
 
@@ -221,6 +222,8 @@ def train_step(inputs, labels):
                                  training = True)
     loss = loss_object(tar_real, predictions, sample_weight=weight[:, 1:]) 
     accuracy = accuracy_function(tar_real, predictions, weight[:, 1:])
+  pdb.set_trace()
+  print(masked_lm.summary())
 
   gradients = tape.gradient(loss, transformer.trainable_variables)
   optimizer.apply_gradients(zip(gradients, transformer.trainable_variables))
@@ -229,54 +232,30 @@ def train_step(inputs, labels):
   train_accuracy(accuracy)
   train_perplexity(perplexity_function(train_loss.result()))
 
-EPOCHS = args.num_steps
-total_steps_required = args.num_steps
-
-steps_elapsed = 0
+EPOCHS = 30
 
 train_start = time.time()
 for epoch in range(EPOCHS):
   start = time.time()
-  if steps_elapsed > total_steps_required:
-    break
 
   train_loss.reset_states()
   train_accuracy.reset_states()
   train_perplexity.reset_states()
 
   for (batch, (inp, tar)) in enumerate(train_batches):
-    if steps_elapsed > total_steps_required:
-      break
     train_step(inp, tar)
-    if (steps_elapsed % 1000 == 0):
-      # We print end-to-end time here just in case.
-      print(f'----------- End-to-End: {time.time() - train_start} -----------')
-    if (steps_elapsed % 5000 == 0):
-      save_path = ckpt_manager.save()
-      print(f'Saved checkpoint for step: {steps_elapsed} path: {save_path}')
-      ckpt.step.assign_add(1)
 
-    print(f'Steps {steps_elapsed} Epoch {epoch + 1} Batch {batch} Loss {train_loss.result():.4f} Perplexity: {train_perplexity.result():.4f} Accuracy {train_accuracy.result():.4f}', flush=True)
+  ## We checkpoint at every epoch now.
+  save_path = ckpt_manager.save()
+  ckpt.step.assign_add(1)
 
-    with open(f'./train_data_{args.attention_type}_{args.rank}.txt', 'a+') as f:
-      f.write(f'{steps_elapsed} {train_loss.result():.4f} {train_accuracy.result():.4f}\n')
+  ## Here, we validate the data.
+  val_loss.reset_states()
+  val_accuracy.reset_states()
+  for (batch, (inp, tar)) in enumerate(val_batches):
+    val_step(inp, tar)
 
-    with open(f'./train_stats_{args.attention_type}_{args.rank}.txt', 'a+') as f:
-        f.write(f'{steps_elapsed} MHA {Stats.mha_time:.4f} MHA-Enc {Stats.mha_enc_time:.4f} MHA-Causal {Stats.mha_causal_time:.4f} MHA-Enc-Dec {Stats.mha_enc_dec_time:.4f} FFN {Stats.ffn_time:.4f} Downsampling {Stats.downsampling_time:.4f} Kernel-Transformation {Stats.transformation_time:.4f}\n')
-
-    steps_elapsed += 1
-
-    ## Here, we validate the data.
-    if steps_elapsed % val_iter_freq == 0 and steps_elapsed != 0:
-      val_loss.reset_states()
-      val_accuracy.reset_states()
-      for (batch, (inp, tar)) in enumerate(val_batches):
-        val_step(inp, tar)
-
-      with open(f'./{args.attention_type}_val_data_{args.lr_rate}.txt', "a+") as f:
-        f.write(f'{val_loss.result():.4f} {val_accuracy.result():.4f}\n')
-
-  print(f'Epoch {epoch + 1} Loss {train_loss.result():.4f} Accuracy {train_accuracy.result():.4f}', flush=True)
+  print(f'Epoch {epoch + 1} Loss {val_loss.result():.4f} Accuracy {val_accuracy.result():.4f}', flush=True)
 
   print(f'Time taken for 1 epoch: {time.time() - start:.2f} secs\n', flush=True)
 
