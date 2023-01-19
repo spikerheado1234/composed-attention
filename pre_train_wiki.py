@@ -11,6 +11,7 @@ from constants import Constants
 from tokenization_proc import mask
 import tensorflow_models as tfm
 import numpy as np
+import pdb
 
 ## Define argument parsing and help over here. ##
 
@@ -194,7 +195,7 @@ def val_step(inputs, labels):
 
   (inp, tar_inp), tar_real, weight = mask_data(inp)
 
-  if args.encoder_only:
+  if args.enc_only:
     inp = inp[:, 1:]
 
   predictions, _ = masked_lm([inp, tar_inp],
@@ -213,7 +214,7 @@ def train_step(inputs, labels):
   (inp, tar_inp), tar_real, weight = mask_data(inp)
 
   # We must drop the start token if we train in the encoder only regime.
-  if args.encoder_only:
+  if args.enc_only:
     inp = inp[:, 1:]
 
   with tf.GradientTape() as tape:
