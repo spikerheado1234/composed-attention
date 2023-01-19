@@ -237,9 +237,9 @@ for epoch in range(EPOCHS):
 
   train_loss.reset_states()
   train_accuracy.reset_states()
-  train_perplexity.reset_states()
   for (batch, (inp, tar)) in enumerate(train_batches):
     train_step(inp, tar)
+    print(f'Loss: {train_loss.result():.3f} Accuracy: {train_accuracy.result():.3f}')
 
   ## We checkpoint at every epoch now.
   save_path = ckpt_manager.save()
