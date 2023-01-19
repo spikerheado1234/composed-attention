@@ -229,7 +229,7 @@ def train_step(inputs, labels):
   train_loss.update_state(loss, sample_weight=weight[:, 1:])
   train_accuracy.update_state(accuracy)
 
-EPOCHS = 30
+EPOCHS = 15
 
 train_start = time.time()
 for epoch in range(EPOCHS):
@@ -239,7 +239,7 @@ for epoch in range(EPOCHS):
   train_accuracy.reset_states()
   for (batch, (inp, tar)) in enumerate(train_batches):
     train_step(inp, tar)
-    print(f'Loss: {train_loss.result():.3f} Accuracy: {train_accuracy.result():.3f}')
+    print(f'Epoch: {epoch + 1} Batch: {batch} Loss: {train_loss.result():.3f} Accuracy: {train_accuracy.result():.3f}')
 
   ## We checkpoint at every epoch now.
   save_path = ckpt_manager.save()
@@ -251,7 +251,7 @@ for epoch in range(EPOCHS):
   for (batch, (inp, tar)) in enumerate(val_batches):
     val_step(inp, tar)
 
-  with open(f'{args.attention_type}_val_data.txt', 'a+') as f:
+  with open(f'{args.attention_type}_val_data_{args.lr_rate}.txt', 'a+') as f:
     f.write(f'{val_loss.result():.3f} {val_accuracy.result():.3f}\n')
 
   print(f'Epoch {epoch + 1} Loss {val_loss.result():.4f} Accuracy {val_accuracy.result():.4f}', flush=True)
