@@ -204,7 +204,7 @@ def val_step(inputs, labels):
   accuracy = accuracy_function(tar_real, predictions, weight[:, 1:])
 
   val_loss.update_state(loss, sample_weight=weight[:, 1:])
-  val_accuracy(accuracy)
+  val_accuracy.update_state(accuracy)
 
 def train_step(inputs, labels):
 
@@ -227,8 +227,7 @@ def train_step(inputs, labels):
   optimizer.apply_gradients(zip(gradients, transformer.trainable_variables))
 
   train_loss.update_state(loss, sample_weight=weight[:, 1:])
-  train_accuracy(accuracy)
-  train_perplexity(perplexity_function(train_loss.result()))
+  train_accuracy.update_state(accuracy)
 
 EPOCHS = 30
 
@@ -239,7 +238,6 @@ for epoch in range(EPOCHS):
   train_loss.reset_states()
   train_accuracy.reset_states()
   train_perplexity.reset_states()
-
   for (batch, (inp, tar)) in enumerate(train_batches):
     train_step(inp, tar)
 
@@ -252,6 +250,9 @@ for epoch in range(EPOCHS):
   val_accuracy.reset_states()
   for (batch, (inp, tar)) in enumerate(val_batches):
     val_step(inp, tar)
+
+  with open(f'{args.attention_type}_val_data.txt', 'a+') as f:
+    f.write(f'{val_loss.result():.3f} {val_accuracy.result():.3f}\n')
 
   print(f'Epoch {epoch + 1} Loss {val_loss.result():.4f} Accuracy {val_accuracy.result():.4f}', flush=True)
 
