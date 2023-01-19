@@ -106,8 +106,6 @@ class RaceLoader:
         enc_str = b'race article: ' + article_np[0] + b' question: ' + questions_np[0] 
         for idx, opt in enumerate(options_np):
           enc_str += opt + b' option ' + bytes(str(idx+1), 'ascii') + ': '
-        ## We return a tensor of: concat(article, [SEP], question)
-        ## alognside the answer
         dec_str = answers_np[0]
         answer_str = answers_np[0]
         return tf.convert_to_tensor([[enc_str]]), tf.convert_to_tensor([[dec_str]]), tf.convert_to_tensor([[answer_str]])
@@ -179,7 +177,6 @@ optimizer = tf.keras.optimizers.Adam(warmup_schedule, beta_1=0.9, beta_2=0.999,
 ## TODO, check for correctness. ##
 loss_object = tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True, reduction='none')
 
-## TODO, come back to this later. ## TODO, sanity check this.
 def accuracy_function(real, pred):
   ## We delete whatever corresponds to the [END] token over here. 
   accuracies = tf.math.equal(tf.cast(real, dtype=tf.int64), tf.reshape(tf.math.argmax(pred, axis=1), [s for s in real.shape]))
@@ -227,14 +224,11 @@ def pad_data(enc_inp, dec_inp, answer):
   answer = dec_inp
 
   answer_np = answer.numpy().astype('S')
-  answer_np = np.char.replace(answer_np, b'A', b'1')
-  answer_np = np.char.replace(answer_np, b'B', b'2')
-  answer_np = np.char.replace(answer_np, b'C', b'3')
-  answer_np = np.char.replace(answer_np, b'D', b'4')
 
   ## We convert answer to ensure that when cross-entropy loss is computed, all is well.
   enc_tok = en_tokenizer.tokenize(enc_inp)
   dec_tok = en_tokenizer.tokenize(dec_inp)
+  answer_np = en_tokenizer.tokenize(tf.convert_to_tensor(answer_np)).merge_dims(-2, -1).to_tensor()
 
   enc_inp = enc_tok.merge_dims(-2, -1).merge_dims(-2, -1).to_tensor()
   dec_inp = dec_tok.merge_dims(-2, -1).merge_dims(-2, -1).to_tensor()
@@ -267,7 +261,7 @@ def train_step(enc_inp, dec_inp, answer):
   optimizer.apply_gradients(zip(gradients, downstream_model.trainable_variables))
 
   train_loss.update_state(loss)
-  train_accuracy(accuracy)
+  train_accuracy.update_state(accuracy)
 
 EPOCHS = 30
 total_steps_required = args.num_steps
@@ -278,8 +272,6 @@ train_start = time.time()
 for epoch in range(EPOCHS):
   start = time.time()
   batch = 0
-  if steps_elapsed > total_steps_required:
-    break
 
   train_loss.reset_states()
   train_accuracy.reset_states()
@@ -288,23 +280,11 @@ for epoch in range(EPOCHS):
   while raceLoader.has_more_train_data():
     if steps_elapsed > total_steps_required:
       break
+    pdb.set_trace()
     enc_inp, dec_inp, answer = raceLoader.gen_next_train_batch()
     
-    ## Add time stub before and after. ##
     train_step(enc_inp, dec_inp, answer)
-    if (steps_elapsed % 1000 == 0):
-      # We print end-to-end time here just in case.
-      print(f'----------- End-to-End: {time.time() - train_start} -----------')
 
-    print(f'Steps {steps_elapsed} Epoch {epoch + 1} Batch {batch} Loss {train_loss.result():.4f} Accuracy {train_accuracy.result():.4f}', flush=True)
-
-    with open(f'./train_data_{args.attention_type}_{args.rank}.txt', 'a+') as f:
-      f.write(f'{steps_elapsed} {train_loss.result():.4f} {train_accuracy.result():.4f}\n')
-
-    with open(f'./train_stats_{args.attention_type}_{args.rank}.txt', 'a+') as f:
-        f.write(f'{steps_elapsed} MHA {Stats.mha_time:.4f} MHA-Enc {Stats.mha_enc_time:.4f} MHA-Causal {Stats.mha_causal_time:.4f} MHA-Enc-Dec {Stats.mha_enc_dec_time:.4f} FFN {Stats.ffn_time:.4f} Downsampling {Stats.downsampling_time:.4f} Kernel-Transformation {Stats.transformation_time:.4f}\n')
-
-    steps_elapsed += 1
     batch += 1
 
   print(f'Epoch {epoch + 1} Loss {train_loss.result():.4f} Accuracy {train_accuracy.result():.4f}', flush=True)
