@@ -61,8 +61,7 @@ transformer = Transformer(
     downsampling_value=args.downsampling_k if args.attention_type == 'LinMHA' or args.attention_type == 'CompMHA' else 32, # Just default to 32 otherwise, doesn't matter since it won't be used.
     attention_type=args.attention_type,
     sequence_length=args.sequence_length,
-    encoder_only=args.enc_only,
-    decoder_only=args.dec_only)
+    encoder_only=args.enc_only)
 
 class CustomSchedule(tf.keras.optimizers.schedules.LearningRateSchedule):
   def __init__(self, d_model, warmup_steps=4000):
