@@ -246,7 +246,7 @@ for epoch in range(EPOCHS):
 train_end = time.time()
 
 with open(f"{args.attention_type}_bench.txt", "a+") as f:
-  f.write(f"{args.sequence_length:.3f} {Stats.mha_time:.3f} {Stats.train_step_time:.3f}\n")
+    f.write(f"{args.sequence_length:.3f} {Stats.mha_time:.3f} {Stats.linear_transformation:.3f} {(Stats.softmax+Stats.q_k_product+Stats.a_v_product):.3f} {(Stats.transformation_time+Stats.q_k_v_product):.3f} {Stats.softmax:.3f} {Stats.transformation_time:.3f}\n")
 
 #with open(f"benchmark_results_{args.attention_type}.txt", "a+") as f:
 #    f.write(f"Train Step Time: {Stats.train_step_time:.3f}, sequence length: {args.sequence_length}, downsampling value: {args.downsampling_k}, hidden_dim: {d_model}, layers: {args.layers}\n")
