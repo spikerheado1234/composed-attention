@@ -21,6 +21,7 @@ parser.add_argument('--sequence_length', dest='sequence_length', type=int, defau
 parser.add_argument('--step_count', dest='num_steps', type=int, default=500000, help='the number of steps as input to pre-training.')
 parser.add_argument('--rank', dest='rank', type=int, default=1, help='The rank of the process, to distinguish output.')
 parser.add_argument('--encoder_only', dest='enc_only', action='store_true', help='Whether we are training in encoder only mode')
+parser.add_argument('--decoder_only', dest='dec_only', action='store_true', help='Whether we are training in decoder only mode')
 parser.add_argument('--hidden_dim', dest='hid_dim', type=int, default=512, help='The size of the hidden dimension.')
 
 args = parser.parse_args()
@@ -60,7 +61,8 @@ transformer = Transformer(
     downsampling_value=args.downsampling_k if args.attention_type == 'LinMHA' or args.attention_type == 'CompMHA' else 32, # Just default to 32 otherwise, doesn't matter since it won't be used.
     attention_type=args.attention_type,
     sequence_length=args.sequence_length,
-    encoder_only=args.enc_only)
+    encoder_only=args.enc_only,
+    decoder_only=args.dec_only)
 
 class CustomSchedule(tf.keras.optimizers.schedules.LearningRateSchedule):
   def __init__(self, d_model, warmup_steps=4000):

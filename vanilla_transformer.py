@@ -257,14 +257,6 @@ class DecoderLayer(tf.keras.layers.Layer):
           dropout=dropout_rate,
           downsample_k=downsampling_value
       )
-      ## FOR NOW WE USE the LinFormerMHA to see how good this performs.
-      #self.mha_masked = CompMHA(
-      #    hidden_size=d_model,
-      #    num_heads=num_attention_heads,
-      #    attention_dropout=dropout_rate,
-      #    causal=True,
-      #    downsample_k=downsampling_value
-      #    )
       self.mha_cross = CompMHA(
           hidden_size=d_model,
           num_heads=num_attention_heads,
@@ -421,23 +413,25 @@ class Transformer(tf.keras.Model):
                target_vocab_size, # Target (English) vocabulary size.
                sequence_length,
                encoder_only=False, # Whether we would like to train an encoder only model.
+               decoder_only=False, # Whether we would like to train an encoder only model.
                dropout_rate=0.1,
                downsampling_value=32, # Default downsampling k value, as expressed in LinFormer, to 32.
                attention_type='MHA' # One of either: MHA, LinMHA or PerfMHA.
                ):
     super().__init__()
     # The encoder.
-    self.encoder = Encoder(
-      num_layers=num_layers,
-      d_model=d_model,
-      num_attention_heads=num_attention_heads,
-      dff=dff,
-      input_vocab_size=input_vocab_size,
-      dropout_rate=dropout_rate,
-      downsampling_value=downsampling_value,
-      attention_type=attention_type,
-      sequence_length=sequence_length
-      )
+    if not decoder_only:
+      self.encoder = Encoder(
+        num_layers=num_layers,
+        d_model=d_model,
+        num_attention_heads=num_attention_heads,
+        dff=dff,
+        input_vocab_size=input_vocab_size,
+        dropout_rate=dropout_rate,
+        downsampling_value=downsampling_value,
+        attention_type=attention_type,
+        sequence_length=sequence_length
+        )
 
     if not encoder_only:
       # The decoder.
@@ -454,12 +448,17 @@ class Transformer(tf.keras.Model):
         )
 
     self.encoder_only = encoder_only
+    self.decoder_only = decoder_only
 
   def call(self, inputs, training):
     # Keras models prefer if you pass all your inputs in the first argument.
     # Portuguese is used as the input (`inp`) language.
     # English is the target (`tar`) language.
     inp, tar = inputs
+
+    ## This is just for benchmarking, will be false otherwise.
+    if self.decoder_only:
+      return self.decoder(tar, tar, None, training)
 
     # The encoder output.
     enc_output = self.encoder(inp, training)  # `(batch_size, inp_seq_len, d_model)`
