@@ -31,6 +31,7 @@ parser.add_argument('--warmup', dest='warmup', default=10000, type=int, help='Th
 parser.add_argument('--task', dest='task', default="cola", type=str, help='The GLUE task to fine-tune on.')
 parser.add_argument('--learning_rate', dest='lr_rate', type=float, default=0.0002, help='the largest constant in the lr schedule.')
 parser.add_argument('--pre-train-data', dest='pt_data', type=str, default="wiki-text", help=' the pre-train dataset we are taking the best checkpoint of.')
+parser.add_argument('--encoder_only', dest='enc_only', action='store_true', help='Whether we are training in encoder only mode')
 
 args = parser.parse_args()
 
@@ -52,6 +53,9 @@ prepare_helper = None
 loss_object = None
 accuracy_function = None
 
+## Maps the token, classify, to its token ID. I manually looked at the 
+## vocabublary and extracted this.
+key_words = {"classify" : 17693}
 ## Some helper methods. ##
 
 ## The invariant is that the enc_part and dec_part can be readily 
@@ -66,7 +70,16 @@ def prepare_transformer_input(enc_part, dec_part):
     enc_part = pad(enc_part, MAX_TOKENS)
     enc_part = enc_part[:, :-2]
     enc_part = add_start_end(enc_part)
-    ## May have to add additional padding just so that it doesn't complain for Linformer type architectures due to poor state capturing whilst checkpointing.
+
+    ## Finally, if we are running in encoder only mode, we replace the first, start, 
+    ## token with the classify token (this is vocab dependent).
+    if args.enc_only:
+        enc_part_numpy = enc_part.numpy()
+        enc_part_numpy[:, 0] = key_words["classify"]
+        enc_part = tf.convert_to_tensor(enc_part_numpy, dtype=tf.int64)
+        ## We also remove the end token to keep tensor sizes the same
+        ## and tensorflow happy.
+        enc_part = enc_part[:, :-1]
 
     ## This is the part that is added, may impact accuracy deliteriously.##
     dec_part = pad(dec_part, MAX_TOKENS)
