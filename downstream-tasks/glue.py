@@ -298,7 +298,7 @@ else:
 
 ## We define our transformer here. ##
 num_layers = args.layers
-d_model = 512
+d_model = 256
 dff = 2048
 num_attention_heads = 8
 dropout_rate = 0.1
@@ -318,7 +318,7 @@ transformer = Transformer(
     encoder_only=args.enc_only)
 
 ## Then, we create the learning rate schedule. ##
-initial_learning_rate = args.lr_rate
+initial_learning_rate = 0.0001
 num_train_steps = args.num_steps
 warmup_steps = args.warmup
 linear_decay = tf.keras.optimizers.schedules.PolynomialDecay(
@@ -331,12 +331,13 @@ warmup_schedule = tfm.optimization.lr_schedule.LinearWarmup(
     after_warmup_lr_sched = linear_decay,
     warmup_steps = warmup_steps
 )
-optimizer = tf.keras.optimizers.Adam(warmup_schedule, beta_1=0.9, beta_2=0.999, epsilon=1e-9)
+#optimizer = tf.keras.optimizers.Adam(warmup_schedule, beta_1=0.9, beta_2=0.999, epsilon=1e-9)
+optimizer = tf.keras.optimizers.Adam(learning_rate=2e-05, beta_1=0.9, beta_2=0.999, epsilon=1e-9)
 
 train_loss = tf.keras.metrics.Mean(name='train_loss')
 train_accuracy = tf.keras.metrics.Mean(name='train_accuracy')
 
-checkpoint_path = './checkpoints/train/' + str(args.attention_type) + '/' + str(args.pt_data) + '/' + str(args.lr_rate) + '/' + str(args.warmup)
+checkpoint_path = './checkpoints/train/' + str(args.attention_type) + '/' + str(args.lr_rate) + '/' + str(args.warmup)
 
 ckpt = tf.train.Checkpoint(step=tf.Variable(1),
                            transformer=transformer,
@@ -413,13 +414,14 @@ EPOCHS = 3
 with open(f'{args.attention_type}_val_data_glue.txt', "a+") as f:
     f.write(f"--------{args.task}--------\n")
 
+
 train_start = time.time()
 for epoch in range(EPOCHS):
   start = time.time()
 
   train_loss.reset_states()
   train_accuracy.reset_states()
-
+  
   for batch, inp in enumerate(train_data):
     train_step(inp)
     print(f'Epoch {epoch + 1} Loss {train_loss.result():.4f} Accuracy {train_accuracy.result():.4f}', flush=True)
@@ -431,7 +433,7 @@ for epoch in range(EPOCHS):
 
   ## We write to file the validation information.
   with open(f'{args.attention_type}_val_data_glue.txt', "a+") as f:
-    f.write(f'{train_loss.result():.4f} {train_accuracy.result():.4f}\n')
+    f.write(f'{train_loss.result():.4f} {train_accuracy.result():.4f} {args.task} {args.rank}\n')
 
   print(f'Epoch {epoch + 1} Loss {train_loss.result():.4f} Accuracy {train_accuracy.result():.4f}', flush=True)
 
