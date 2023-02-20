@@ -10,6 +10,7 @@ from jax import random
 from functools import partial
 import argparse
 import flax.linen as nn
+from flax.training import checkpoints, train_state
 from transformer_skeleton import Transformer
 from pre_train_wiki_loader import get_train_ds, get_val_ds, make_batches
 from tokenization_proc import mask
@@ -95,9 +96,21 @@ enc_input = jnp.round(random.uniform(random.PRNGKey(44), (args.batch_size, args.
 dec_input = jnp.round(random.uniform(random.PRNGKey(45), (args.batch_size, args.sequence_length)) * Constants.wiki_vocab_size).astype(jnp.int32)
 params = masked_lm.init({'params': param_key, 'dropout': dropout_key}, enc_input, dec_input, train=True)
 optimizer = optax.adam(learning_rate)
-opt_state = optimizer.init(params)
+opt_state = optimizer.init(params) ## TODO, check for correctness over here.
 
-## Question, how do I initialize the optimizer state? ##
+## We prepare the checkpoint information. ##
+checkpoint_path = './checkpoints/train/' + str(args.attention_type) + '/' + str(learning_rate) + '/' + str(args.warmup)
+ckpt_count = 0
+pdb.set_trace()
+## We attempt to restore the latest checkpoint. ##
+if checkpoints.latest_checkpoint(ckpt_dir=checkpoint_path):
+    checkpoints.restore_checkpoint(ckpt_dir=checkpoint_path, target=params['params']['transformer'])
+    print('Latest checkpoint restored!')
+else: ## Otherwise we create a checkpoint. ##
+    state = train_state.TrainState.create(apply_fn=transformer.apply, params=params['params']['transformer'], tx=optimizer)
+    checkpoints.save_checkpoint(ckpt_dir=checkpoint_path, target=state, step=ckpt_count)
+    print('checkpoint succesfully created.')
+
 def train_step(parameters, inp, tar_inp, data_real, train, weights, dropout_key, opt_state, optimizer):
     @partial(jax.jit, static_argnames=['train'])
     def compute_loss(parameters, inp, tar_inp, train, dropout_key, real, weights):
@@ -115,8 +128,21 @@ def train_step(parameters, inp, tar_inp, data_real, train, weights, dropout_key,
     ## Returns the tuple of: (new model parameters, optimizer state, loss).
     return params, opt_state, loss
 
-## Over here, we have the main training loop. ##
+def val_step(parameters, inp, tar_inp, data_real, train, weights, dropout_key):
+    @partial(jax.jit, static_argnames=['train'])
+    def compute_loss(parameters, inp, tar_inp, train, dropout_key, real, weights):
+        logits = masked_lm.apply(parameters, inp, tar_inp, train=train, rngs={'dropout': dropout_key})
 
+        ## TODO, is this the correct way to implement MLM? How can I know if this is correct?
+        loss = optax.softmax_cross_entropy_with_integer_labels(logits, real)
+        loss *= weights
+        return loss.sum() / jnp.sum(weights)      
+
+    loss = compute_loss(parameters, inp, tar_inp, train, dropout_key, data_real, weights) 
+
+    return loss
+
+## Over here, we have the main training loop. ##
 EPOCHS = 15
 
 for epoch in range(EPOCHS):
@@ -139,6 +165,11 @@ for epoch in range(EPOCHS):
         ## Finally, call one train_step. ##
         params, opt_state, loss = train_step(params, inp, tar_inp, tar_real, True, weight[:, 1:], dropout_key, opt_state, optimizer)
 
+    ## Here we checkpoint our model.
+    ckpt_count += 1
+    checkpoints.save_checkpoint(ckpt_dir=checkpoint_path, target=params['params']['transformer'], step=ckpt_count)
+    print('succesfully checkpointed.')
+
     ## Then we validate. ##
     for batch, (inputs, labels) in enumerate(train_batches):
         
@@ -146,7 +177,13 @@ for epoch in range(EPOCHS):
         (inp, tar_inp) = inputs
         tar_real = labels
         (inp, tar_inp), tar_real, weight = mask_data(inp)
+        ## Convert from tensors to jnp ndarrays.
+        inp = jnp.array(inp.numpy())
+        tar_inp = jnp.array(tar_inp.numpy())
+        tar_real = jnp.array(tar_real.numpy())
+        weight = jnp.array(weight)
         ## Refresh the dropout_key as well.## 
         dropout_key = random.split(dropout_key)[1]
 
         ## Lastly, we call the validation function. ##
+        loss = val_step(params, inp, tar_inp, tar_real, True, weight[:, 1:], dropout_key)
