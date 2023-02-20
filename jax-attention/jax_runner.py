@@ -109,7 +109,6 @@ def train_step(parameters, inp, tar_inp, data_real, train, weights, dropout_key,
         return loss.sum() / jnp.sum(weights) 
     
     loss, grads = value_and_grad(compute_loss)(parameters, inp, tar_inp, train, dropout_key, data_real, weights)
-    pdb.set_trace()
     updates, opt_state = optimizer.update(grads, opt_state, parameters)
     params = optax.apply_updates(parameters, updates)
 
