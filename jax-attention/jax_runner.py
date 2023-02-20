@@ -50,11 +50,12 @@ BATCH_SIZE = args.batch_size
 ## We make the batches here. ##
 train_batches = make_batches(train_ds, BUFFER_SIZE, BATCH_SIZE)
 val_batches = make_batches(val_ds, BUFFER_SIZE,BATCH_SIZE)
+
 ## Hyperparameters ##
 num_layers = args.layers
-d_model = 512
-dff = 2048
-num_attention_heads = 8
+d_model = 768
+dff = 3072
+num_attention_heads = 12
 dropout_rate = 0.1
 rank = args.rank
 learning_rate = args.lr_rate
