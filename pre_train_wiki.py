@@ -48,7 +48,7 @@ train_batches = make_batches(train_ds, BUFFER_SIZE, BATCH_SIZE)
 val_batches = make_batches(val_ds, BUFFER_SIZE,BATCH_SIZE)
 ## Hyperparameters ##
 num_layers = args.layers
-d_model = 512
+d_model = 256
 dff = 2048
 num_attention_heads = 8
 dropout_rate = 0.1
@@ -208,10 +208,13 @@ def val_step(inputs, labels):
 
 def train_step(inputs, labels):
 
+  step_start = time.time()
+
   (inp, tar_inp) = inputs
   tar_real = labels
 
   (inp, tar_inp), tar_real, weight = mask_data(inp)
+
 
   # We must drop the start token if we train in the encoder only regime.
   if args.enc_only:
@@ -229,7 +232,10 @@ def train_step(inputs, labels):
   train_loss.update_state(loss, sample_weight=weight[:, 1:])
   train_accuracy.update_state(accuracy)
 
-EPOCHS = 15
+  step_end = time.time()
+  Stats.train_step_time += (step_end - step_start)
+
+EPOCHS = 30
 
 train_start = time.time()
 for epoch in range(EPOCHS):
@@ -256,8 +262,8 @@ for epoch in range(EPOCHS):
 
   print(f'Epoch {epoch + 1} Loss {val_loss.result():.4f} Accuracy {val_accuracy.result():.4f}', flush=True)
 
-  print(f'Time taken for 1 epoch: {time.time() - start:.2f} secs\n', flush=True)
+  print(f'Step Time taken for 1 epoch: {Stats.train_step_time:.2f} secs\n', flush=True)
 
 train_end = time.time()
 
-print(f'Total training + validation time: {train_end-train_start}\n', flush=True)
+print(f'Total step time: {Stats.train_step_time}\n', flush=True)

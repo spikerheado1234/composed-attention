@@ -142,7 +142,7 @@ class MaskedLM(tf.keras.Model):
         # The final linear layer.
         self.final_layer = tf.keras.layers.Dense(target_vocab_size)
 
-    ##@tf.function
+    #@tf.function
     def call(self, inp):
       output, attention_weights = self.transformer(inp)
 
@@ -165,6 +165,7 @@ def mask_data(inp_tok):
 
   return (inp, tar_inp), tar_real, sample_weights
 
+print(f'-----{args.attention_type}------')
 def val_step(inputs, labels):
   (inp, tar_inp) = inputs
   tar_real = labels
@@ -178,15 +179,15 @@ def val_step(inputs, labels):
   predictions, _ = masked_lm([inp, tar_inp], training = True)
   forward_prop_end = time.time()
   Stats.total_forward_prop_time += (forward_prop_end - forward_prop_start)
-  loss = loss_object(tar_real, predictions, sample_weight=weight[:, 1:]) 
-  accuracy = accuracy_function(tar_real, predictions, weight[:, 1:])
+  #loss = loss_object(tar_real, predictions, sample_weight=weight[:, 1:]) 
+  #accuracy = accuracy_function(tar_real, predictions, weight[:, 1:])
 
   train_step_end = time.time()
   Stats.train_step_time += train_step_end - train_step_start
 
-  train_loss.update_state(loss, sample_weight=weight[:, 1:])
-  train_accuracy(accuracy)
-  train_perplexity(perplexity_function(train_loss.result()))
+  #train_loss.update_state(loss, sample_weight=weight[:, 1:])
+  #train_accuracy(accuracy)
+  #train_perplexity(perplexity_function(train_loss.result()))
 
 def train_step(inputs, labels):
   (inp, tar_inp) = inputs
@@ -223,7 +224,7 @@ def train_step(inputs, labels):
 
 
 EPOCHS = 30
-total_steps_required = 100
+total_steps_required = 1000
 
 steps_elapsed = 0
 
@@ -241,14 +242,15 @@ for epoch in range(EPOCHS):
     if steps_elapsed > total_steps_required:
       break
     val_step(inp, tar)
+    #train_step(inp, tar)
 
     steps_elapsed += 1
 
 train_end = time.time()
 
-with open(f"{args.attention_type}_bench.txt", "a+") as f:
+with open(f"{args.attention_type}_bench_{args.rank}.txt", "a+") as f:
     #f.write(f"{args.sequence_length:.3f} {Stats.mha_time:.3f} {Stats.linear_transformation:.3f} {(Stats.softmax+Stats.q_k_product+Stats.a_v_product):.3f} {(Stats.transformation_time+Stats.q_k_v_product):.3f} {Stats.softmax:.3f} {Stats.transformation_time:.3f}\n")
-    f.write(f"{args.sequence_length:.3f} {Stats.total_forward_prop_time:.3f}\n") 
+    f.write(f"{args.sequence_length:.3f} {Stats.total_forward_prop_time:.3f} {Stats.train_step_time:.3f}\n") 
 
 #with open(f"benchmark_results_{args.attention_type}.txt", "a+") as f:
 #    f.write(f"Train Step Time: {Stats.train_step_time:.3f}, sequence length: {args.sequence_length}, downsampling value: {args.downsampling_k}, hidden_dim: {d_model}, layers: {args.layers}\n")

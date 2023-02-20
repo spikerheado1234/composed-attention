@@ -31,7 +31,6 @@ parser.add_argument('--warmup', dest='warmup', default=10000, type=int, help='Th
 parser.add_argument('--task', dest='task', default="cola", type=str, help='The GLUE task to fine-tune on.')
 parser.add_argument('--learning_rate', dest='lr_rate', type=float, default=0.0002, help='the largest constant in the lr schedule.')
 parser.add_argument('--pre-train-data', dest='pt_data', type=str, default="wiki-text", help=' the pre-train dataset we are taking the best checkpoint of.')
-parser.add_argument('--encoder_only', dest='enc_only', action='store_true', help='Whether we are training in encoder only mode')
 
 args = parser.parse_args()
 
@@ -372,7 +371,8 @@ class DownstreamModel(tf.keras.Model):
         self.transformer = transformer
 
         if args.task == "cola" or args.task == "sst2" or args.task == "mrpc" or args.task == "qqp" or args.task == "stsb" or args.task == "mnli" or args.task == "qnli" or args.task == "rte" or args.task == "wnli":
-            self.layer_out = tf.keras.layers.Dense(target_vocab_size) ## Again, another hyperparameter to be tuned.
+            self.layer_pre_out = tf.keras.layers.Dense(2048) ## Again, another hyperparameter to be tuned.
+            self.layer_out = tf.keras.layers.Dense(target_vocab_size) 
         else:
             self.layer_expand = tf.keras.layers.Dense(64, activation=tf.keras.activations.relu)
             self.layer_out = tf.keras.layers.Dense(1, activation=tf.keras.activations.sigmoid)
@@ -381,6 +381,7 @@ class DownstreamModel(tf.keras.Model):
     def call(self, inp):
         output, _ = self.transformer(inp)
         if args.task == "cola" or args.task == "sst2" or args.task == "mrpc" or args.task == "qqp" or args.task == "stsb" or args.task == "mnli" or args.task == "qnli" or args.task == "rte" or args.task == "wnli":
+            output = self.layer_pre_out(output)
             return self.layer_out(output)
         else:
             output = self.layer_expand(output)
@@ -408,9 +409,10 @@ def train_step(inp):
   enc_part, dec_part = prepare_helper(inp)
   enc_part, dec_part, real_val, weights = prepare_transformer_input(enc_part, dec_part)
 
+  train_start = time.time()
+
   with tf.GradientTape() as tape:
-    predictions = downstream_model([enc_part, dec_part],
-                                    training = True)
+    predictions = downstream_model([enc_part, dec_part], training=True)
 
     loss = loss_object(real_val, predictions, sample_weight=weights) 
     accuracy = compute_accuracy(real_val, predictions, weights)
@@ -421,12 +423,14 @@ def train_step(inp):
   train_loss.update_state(loss)
   train_accuracy.update_state(accuracy)
 
+  train_end = time.time()
+  Stats.train_step_time += (train_end - train_start)
+
 EPOCHS = 3
 
 ## We write everything to one file.
 with open(f'{args.attention_type}_val_data_glue.txt', "a+") as f:
     f.write(f"--------{args.task}--------\n")
-
 
 train_start = time.time()
 for epoch in range(EPOCHS):
@@ -453,5 +457,7 @@ for epoch in range(EPOCHS):
   print(f'Time taken for 1 epoch: {time.time() - start:.2f} secs\n', flush=True)
 
 train_end = time.time()
+with open(f'{args.attention_type}_val_data_glue.txt', "a+") as f:
+  f.write(f"Train time: {Stats.train_step_time:.4f}\n")
 
 print(f'Total training time: {train_end-train_start}\n', flush=True)

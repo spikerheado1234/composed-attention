@@ -11,11 +11,13 @@ from functools import partial
 import argparse
 import flax.linen as nn
 from flax.training import checkpoints, train_state
+from flax.core.frozen_dict import freeze
 from transformer_skeleton import Transformer
 from pre_train_wiki_loader import get_train_ds, get_val_ds, make_batches
 from tokenization_proc import mask
 from constants import Constants
 import optax
+from stats import Stats
 import pdb
 
 ## Custom command line arguments over here. ##
@@ -86,6 +88,14 @@ def mask_data(inp_tok):
 
   return (inp, tar_inp), tar_real, sample_weights
 
+## We create a triangular schedule here. ##
+def create_lr_schedule(peak_lr, warmup_steps, total_step_count):
+    rem_steps = total_step_count - warmup_steps
+    return optax.join_schedules([
+        optax.linear_schedule(init_value=0.0, end_value=peak_lr, transition_steps=warmup_steps),
+        optax.linear_schedule(init_value=peak_lr, end_value=0.0, transition_steps=rem_steps)
+    ], [warmup_steps])
+
 transformer = Transformer(d_model, int(d_model / num_attention_heads), num_attention_heads, 
                             dropout_rate, args.sequence_length, dff, num_layers, Constants.wiki_vocab_size, args.enc_only)
 
@@ -96,19 +106,25 @@ dropout_key = random.PRNGKey(43)
 enc_input = jnp.round(random.uniform(random.PRNGKey(44), (args.batch_size, args.sequence_length)) * Constants.wiki_vocab_size).astype(jnp.int32)
 dec_input = jnp.round(random.uniform(random.PRNGKey(45), (args.batch_size, args.sequence_length)) * Constants.wiki_vocab_size).astype(jnp.int32)
 params = masked_lm.init({'params': param_key, 'dropout': dropout_key}, enc_input, dec_input, train=True)
-optimizer = optax.adam(learning_rate)
+optimizer = optax.adam(create_lr_schedule(learning_rate, args.warmup, args.num_steps))
 opt_state = optimizer.init(params) ## TODO, check for correctness over here.
 
 ## We prepare the checkpoint information. ##
 checkpoint_path = './checkpoints/train/' + str(args.attention_type) + '/' + str(learning_rate) + '/' + str(args.warmup)
 ckpt_count = 0
-pdb.set_trace()
+state = train_state.TrainState.create(apply_fn=transformer.apply, params=params['params']['transformer'], tx=optimizer)
 ## We attempt to restore the latest checkpoint. ##
 if checkpoints.latest_checkpoint(ckpt_dir=checkpoint_path):
-    checkpoints.restore_checkpoint(ckpt_dir=checkpoint_path, target=params['params']['transformer'])
+
+    ## Honestly, not super confident this is correct, but it's at least a start. I need to debug this
+    ## extremely carefully. 
+    restored_state = checkpoints.restore_checkpoint(ckpt_dir=checkpoint_path, target=state)
+    unfrozen_dict = params.unfreeze()
+    unfrozen_loaded_params = restored_state.params.unfreeze()
+    unfrozen_dict['params']['transformer'] = unfrozen_loaded_params
+    params = freeze(unfrozen_dict)
     print('Latest checkpoint restored!')
 else: ## Otherwise we create a checkpoint. ##
-    state = train_state.TrainState.create(apply_fn=transformer.apply, params=params['params']['transformer'], tx=optimizer)
     checkpoints.save_checkpoint(ckpt_dir=checkpoint_path, target=state, step=ckpt_count)
     print('checkpoint succesfully created.')
 
@@ -165,6 +181,8 @@ for epoch in range(EPOCHS):
 
         ## Finally, call one train_step. ##
         params, opt_state, loss = train_step(params, inp, tar_inp, tar_real, True, weight[:, 1:], dropout_key, opt_state, optimizer)
+        pdb.set_trace()
+        print(f'Epoch: {epoch + 1} Batch: {batch+1} Loss: {loss}')
 
     ## Here we checkpoint our model.
     ckpt_count += 1
@@ -172,6 +190,8 @@ for epoch in range(EPOCHS):
     print('succesfully checkpointed.')
 
     ## Then we validate. ##
+    total_val_loss = 0
+    num_batches = 0
     for batch, (inputs, labels) in enumerate(train_batches):
         
         ## We pre-process. ##
@@ -187,4 +207,11 @@ for epoch in range(EPOCHS):
         dropout_key = random.split(dropout_key)[1]
 
         ## Lastly, we call the validation function. ##
-        loss = val_step(params, inp, tar_inp, tar_real, True, weight[:, 1:], dropout_key)
+        loss = val_step(params, inp, tar_inp, tar_real, False, weight[:, 1:], dropout_key)
+        total_val_loss += loss
+        num_batches += 1
+
+    total_val_loss /= float(num_batches)
+    print(f'Epoch {epoch + 1} Validation-Loss: {total_val_loss:.3f}')
+    with open(f'{args.attention_type}_val_data_{args.lr_rate}.txt', 'a+') as f:
+        f.write(f'{total_val_loss/num_batches:.3f}\n')
