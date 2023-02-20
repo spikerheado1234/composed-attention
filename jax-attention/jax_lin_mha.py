@@ -1,3 +1,8 @@
+import sys
+import os
+
+sys.path.append(os.getcwd())
+
 import jax.numpy as jnp
 import jax
 import flax.linen as nn
@@ -75,12 +80,6 @@ class MHA(nn.Module):
 
         ## Then we take the softmax
         attn_mat = softmax(q_ks)
-
-        ## TODO, left to check whether the dropout should be here, or after
-        ## in the entire Attention Mechanism. It seems different implementations 
-        ## have different answers.
-        ## Then, we drop out the attn_mat.
-        attn_mat = self.dropout_layer(attn_mat, deterministic=not train)
 
         ## Then we right multiply by the values and return the result.
         a_v =  jnp.einsum('bhqk, bkhd -> bqhd', attn_mat, values)

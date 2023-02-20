@@ -1,14 +1,19 @@
+import sys
+import os
+
+sys.path.append(os.getcwd())
 
 import flax.linen as nn
 
 from jax_mha import MHA as VanillaMHA
 import pdb
 import math
+import jax.numpy as jnp
+import jax
 
 class PositionalEmbedding(nn.Module):
     vocabulary_size : int
     embedding_dim : int
-    sequence_length: int
     dropout : float
     
     def setup(self):
@@ -16,16 +21,17 @@ class PositionalEmbedding(nn.Module):
         self.embedding_layer = nn.Embed(self.vocabulary_size, self.embedding_dim)
         self.dropout_embedding = nn.Dropout(rate=self.dropout)
 
-    def __call__(self, x, *, train):
+    def __call__(self, x, *, train): # Is is a tensor of shape: [batch_size, sequence_length].
         assert self.embedding_dim % 2 == 0, "Embedding Dimension should be divisible by two!"
 
         x = self.embedding_layer(x)
         ## Next, we have to compute a vector of positional embeddings to add.
-        pos_embed = jnp.zeros((self.sequence_length, self.embedding_dim))
-        position = jnp.arange(0, self.sequence_length, dtype=jnp.float32)
+        pos_embed = jnp.zeros((x.shape[1], self.embedding_dim))
+        position = jnp.arange(0, x.shape[1], dtype=jnp.float32)
         div_term = jnp.exp(jnp.arange(0, self.embedding_dim, 2) * (-math.log(10000.0) / self.embedding_dim))
-        pos_embed.at[:, 0::2].set(jnp.sin(jnp.einsum('a,b -> ab', position, div_term)))
-        pos_embed.at[:, 1::2].set(jnp.cos(jnp.einsum('a,b -> ab', position, div_term)))
+        #pos_embed.at[:, 0::2].set(jnp.sin(jnp.einsum('a,b -> ab', position, div_term)))
+        pos_embed = pos_embed.at[:, 0::2].set(jnp.sin(jnp.einsum('a,b -> ab', position, div_term)))
+        pos_embed = pos_embed.at[:, 1::2].set(jnp.cos(jnp.einsum('a,b -> ab', position, div_term)))
 
         ## Finally, we return the dropped out summed result.
         return self.dropout_embedding(x + pos_embed, deterministic=not train)
@@ -56,12 +62,10 @@ class EncoderLayer(nn.Module):
         self.dropout_three = nn.Dropout(self.dropout)
 
     def __call__(self, x, *, train):
-
         queries, keys, values = x, x, x
 
         ## we first compute the attention value.
         attn = self.mha([queries, keys, values], train=train)
-
         ## We drop out the values of attn.
         attn = self.dropout_one(attn, deterministic=not train)
 
@@ -185,8 +189,7 @@ class Transformer(nn.Module):
     encoder_only : bool
 
     def setup(self):
-        self.positional_embedding = PositionalEmbedding(self.vocabulary_size, self.hidden_dim, 
-                                                        self.sequence_length, self.dropout)
+        self.positional_embedding = PositionalEmbedding(self.vocabulary_size, self.hidden_dim, self.dropout)
 
         self.encoder = Encoder(self.hidden_dim, self.head_dim, self.num_heads, 
                                self.dropout, self.sequence_length, self.ffn_size, 
@@ -198,23 +201,21 @@ class Transformer(nn.Module):
 
         self.last_ffn = nn.Dense(self.vocabulary_size)
 
-    def __call__(self, x, *, train):
+    def __call__(self, encoder_input, decoder_input, *, train):
         if self.encoder_only:
             ## Over here, x is one input.
-            encoder_input = self.positional_embedding(x, train=train)
+            encoder_input = self.positional_embedding(encoder_input, train=train)
             encoder_output = self.encoder(encoder_input, train=train)
-            output = self.last_ffn(encoder_output)
-            return output 
+            return encoder_output 
         else:
             ## Over here, x is a list: [encoder_input, decoder_input]
-            encoder_input, decoder_input = x
             encoder_input = self.positional_embedding(encoder_input, train=train)
             decoder_input = self.positional_embedding(decoder_input, train=train)
             encoder_output = self.encoder(encoder_input, train=train)
-            decoder_output = self.decoder([encoder_input, decoder_input], train=train)
-            output = self.last_ffn(decoder_output)
-            return output 
+            decoder_output = self.decoder([encoder_output, decoder_input], train=train)
+            return decoder_output 
 
+"""
 ## This section is for unit testing all my code.
 import jax.numpy as jnp
 from jax import random
@@ -242,3 +243,4 @@ last_dropout_key = dropout_key
 for _ in range(2):
     attention_mat = transformer.apply(params, [enc_input, dec_input], train=True, rngs={'dropout': dropout_key})
     last_dropout_key = random.split(last_dropout_key)[1]
+"""
