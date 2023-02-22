@@ -21,8 +21,8 @@ class MHA(nn.Module):
     num_heads : int
     dropout : float
     mask : bool
-    sequence_length : int ## Need sequence length for random matrix generation.
-    downsampling_k : int = 64 ## Default it to 64.
+    sequence_length : int
+    downsampling_k : int = 64
 
     """
     ## For some reason putting the initializers over here doesn't seem to work.
@@ -35,11 +35,12 @@ class MHA(nn.Module):
     def setup(self):
         ## Preambulatory work of setting up the initializers and weights.
         init_shape = (self.hidden_dim, self.num_heads, self.head_dim)
-        self.query_kernel = self.param('query_kernel', jax.nn.initializers.glorot_normal(), init_shape, jnp.float32)
-        self.key_kernel = self.param('key_kernel', jax.nn.initializers.glorot_normal(), init_shape, jnp.float32)
-        self.value_kernel = self.param('value_kernel', jax.nn.initializers.glorot_normal(), init_shape, jnp.float32)
+        self.query_kernel = self.param('query_kernel', jax.nn.initializers.glorot_uniform(), init_shape, jnp.float32)
+        self.key_kernel = self.param('key_kernel', jax.nn.initializers.glorot_uniform(), (self.hidden_dim, self.num_heads, self.head_dim))
+        self.value_kernel = self.param('value_kernel', jax.nn.initializers.glorot_uniform(), (self.hidden_dim, self.num_heads, self.head_dim))
 
-        ## We initialize the downsampling values here.
+        self.numerical_stabilizer = 0.001
+
         downsampling_shape = (self.downsampling_k, self.sequence_length)
         mean = 0.0
         sd = float(1)/float(self.downsampling_k)
@@ -52,7 +53,6 @@ class MHA(nn.Module):
         ## So we do the hack of concatenating the queries, keys and values into a list and unpacking it.
         query, key, value = x
 
-        ## First, we downsample the keys and values.
         key = jnp.einsum('ks, bsd -> bkd', self.key_downsampling_mat, key)
         value = jnp.einsum('ks, bsd -> bkd', self.value_downsampling_mat, value)
 
@@ -61,24 +61,38 @@ class MHA(nn.Module):
         keys = jnp.einsum('bsd, dnh -> bsnh', key, self.key_kernel)
         values = jnp.einsum('bsd, dnh -> bsnh', value, self.value_kernel)
 
-        ## Then we compute the product in between the queries and the keys.
-        q_ks = jnp.einsum('bqnh, bknh -> bnqk', queries, keys) 
-
-        ## Then we scale it with the head hidden dimension.
-        q_ks /= jnp.sqrt(jnp.array(self.head_dim).astype(np.float32))
-
-        if self.mask:
+        if self.mask: ## Here, we do normal linformer-style attention.
+            ## We have to multiply the queries with the keys.
+            q_ks = jnp.einsum('bqnh, bknh -> bnqk', queries, keys)
             trilled_mask = jnp.ones((queries.shape[0], queries.shape[2], queries.shape[1], keys.shape[1])).astype(bool) ## This is of size: [batch_size, num_heads, query_seq_length, key_seq_length]
             trilled_mask = jnp.tril(trilled_mask)
             ## TODO, check for correctness
             trilled_mask = trilled_mask[:, :, :, :self.downsampling_k] 
             q_ks = jnp.where(trilled_mask == False, -9e15, q_ks)
 
-        ## Then we take the softmax
-        attn_mat = softmax(q_ks)
+            ## Then we take the softmax
+            attn_mat = softmax(q_ks)
 
-        ## Then we right multiply by the values and return the result.
-        a_v =  jnp.einsum('bhqk, bkhd -> bqhd', attn_mat, values)
+            ## Then we right multiply by the values and return the result.
+            a_v =  jnp.einsum('bhqk, bkhd -> bqhd', attn_mat, values)
+        else:
+            ## Non-causal numerator. ##
+            ## The following is taken directly from the Performer Code. ##
+            ## source: https://github.com/google-research/google-research/blob/master/performer/fast_attention/tensorflow/fast_attention.py#L322 ##
+
+            ## We then re-transform the queries and the keys.
+            queries = nn.relu(queries) + self.numerical_stabilizer
+            keys = nn.relu(keys) + self.numerical_stabilizer
+
+            ## TODO, check for correctness. ##
+            kvs = jnp.einsum("blhm,blhd->bhmd", keys, values)
+            a_v = jnp.einsum("blhm,bhmd->blhd", queries, kvs)
+            ## Non-causal denominator. ##
+            ks_sum = jnp.einsum("blhm->bhm", keys)
+            normalizer = jnp.einsum("blhm,bhm->blh", queries, ks_sum)
+            ## Then we transpose back and do the normalization. ##
+            normalizer = jnp.expand_dims(normalizer, len(normalizer.shape))
+            a_v = a_v / normalizer
 
         ## Finally, concatenate across the head dimension.
         return a_v.reshape((a_v.shape[0], a_v.shape[1], a_v.shape[2]*a_v.shape[3]))
