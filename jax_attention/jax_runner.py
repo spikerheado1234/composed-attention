@@ -107,7 +107,7 @@ def create_lr_schedule(peak_lr, warmup_steps, total_step_count):
         optax.linear_schedule(init_value=peak_lr, end_value=0.0, transition_steps=rem_steps)
     ], [warmup_steps])
 
-transformer = Transformer(d_model, int(d_model / num_attention_heads), num_attention_heads, dropout_rate, args.sequence_length, dff, num_layers, Constants.wiki_vocab_size, args.enc_only)
+transformer = Transformer(d_model, int(d_model / num_attention_heads), num_attention_heads, dropout_rate, args.sequence_length, dff, num_layers, Constants.wiki_vocab_size, args.enc_only, args.downsampling_k, args.attention_type)
 
 ## We have to first initialize the model & optimizer. ##
 masked_lm = MaskedLM(transformer, Constants.wiki_vocab_size)
