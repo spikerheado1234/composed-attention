@@ -97,6 +97,7 @@ class MHA(nn.Module):
         ## Finally, concatenate across the head dimension.
         return a_v.reshape((a_v.shape[0], a_v.shape[1], a_v.shape[2]*a_v.shape[3]))
 
+"""
 ## A place to unit test my Multi-Head-Attention Implementation.
 ## Unit tests are always great!
 from jax import random
@@ -105,7 +106,7 @@ hidden_dim = 15
 head_dim = 5
 num_heads = 3
 dropout = 0.1
-mask = True 
+mask = False 
 batch_size = 2
 sequence_length = 4
 downsampling_k = 2
@@ -122,3 +123,4 @@ attention_mat = mha.apply(params, [qs, ks, vs], train=True, rngs={'dropout': dro
 ## Further sanity checks.
 print(attention_mat)
 print(attention_mat.shape)
+"""

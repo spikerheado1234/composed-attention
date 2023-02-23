@@ -51,7 +51,7 @@ class MHA(nn.Module):
         ## Jax complains about passing in multiple arguments.
         ## So we do the hack of concatenating the queries, keys and values into a list and unpacking it.
         query, key, value = x
-
+        pdb.set_trace()
         ## First, we downsample the keys and values.
         key = jnp.einsum('ks, bsd -> bkd', self.key_downsampling_mat, key)
         value = jnp.einsum('ks, bsd -> bkd', self.value_downsampling_mat, value)
@@ -83,6 +83,7 @@ class MHA(nn.Module):
         ## Finally, concatenate across the head dimension.
         return a_v.reshape((a_v.shape[0], a_v.shape[1], a_v.shape[2]*a_v.shape[3]))
 
+"""
 ## A place to unit test my Multi-Head-Attention Implementation.
 ## Unit tests are always great!
 from jax import random
@@ -108,3 +109,4 @@ attention_mat = mha.apply(params, [qs, ks, vs], train=True, rngs={'dropout': dro
 ## Further sanity checks.
 print(attention_mat)
 print(attention_mat.shape)
+"""
