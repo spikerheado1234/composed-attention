@@ -262,6 +262,7 @@ class Transformer(nn.Module):
             decoder_output = self.decoder([encoder_output, decoder_input], train=train)
             return decoder_output 
 
+"""
 ## This section is for unit testing all my code.
 import jax.numpy as jnp
 from jax import random
@@ -291,3 +292,4 @@ for _ in range(2):
     attention_mat = transformer.apply(params, enc_input, dec_input, train=True, rngs={'dropout': dropout_key})
     print(attention_mat)
     last_dropout_key = random.split(last_dropout_key)[1]
+"""
