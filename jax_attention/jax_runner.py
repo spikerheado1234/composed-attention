@@ -152,6 +152,7 @@ def train_step(parameters, inp, tar_inp, data_real, train, weights, dropout_key,
     return params, opt_state, loss
 
 def val_step(parameters, inp, tar_inp, data_real, train, weights, dropout_key):
+
     @partial(jax.jit, static_argnames=['train'])
     def compute_loss(parameters, inp, tar_inp, train, dropout_key, real, weights):
         logits = masked_lm.apply(parameters, inp, tar_inp, train=train, rngs={'dropout': dropout_key})
