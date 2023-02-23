@@ -66,9 +66,9 @@ val_batches = make_batches(val_ds, BUFFER_SIZE,BATCH_SIZE)
 
 ## Hyperparameters ##
 num_layers = args.layers
-d_model = 768
+d_model = 512
 dff = 3072
-num_attention_heads = 12
+num_attention_heads = 8
 dropout_rate = 0.1
 rank = args.rank
 learning_rate = args.lr_rate
@@ -193,10 +193,6 @@ for epoch in range(EPOCHS):
         loss_accum += loss
         print(f'Epoch: {epoch + 1} Batch: {batch+1} Loss: {loss_accum/float(batch+1):.3f}', flush=True)
 
-        ## We have to clear the cache so that we do not OOM. ##
-        if batch % 50 == 0:
-            xla._xla_callable.cache_clear()
-
     ## Here we checkpoint our model.
     ckpt_count += 1
     checkpoints.save_checkpoint(ckpt_dir=checkpoint_path, target=params['params']['transformer'], step=ckpt_count)
@@ -222,10 +218,6 @@ for epoch in range(EPOCHS):
         loss = val_step(params, inp, tar_inp, tar_real, False, weight[:, 1:], dropout_key)
         total_val_loss += loss
         num_batches += 1
-
-        ## We have to clear the cache so that we do not OOM. ##
-        if batch % 50 == 0:
-            xla._xla_callable.cache_clear()
 
     total_val_loss /= float(num_batches)
     print(f'Epoch {epoch + 1} Validation-Loss: {total_val_loss:.3f}', flush=True)
