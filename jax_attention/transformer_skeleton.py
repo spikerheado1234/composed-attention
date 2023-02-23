@@ -6,6 +6,9 @@ sys.path.append(os.getcwd())
 import flax.linen as nn
 
 from jax_mha import MHA as VanillaMHA
+from jax_sonic_mha import MHA as CompMHA
+from jax_lin_mha import MHA as LinMHA
+from jax_performer_mha import MHA as PerfMHA
 import pdb
 import math
 import jax.numpy as jnp
@@ -43,11 +46,23 @@ class EncoderLayer(nn.Module):
     dropout : float
     sequence_length : int
     ffn_size : int
+    downsampling_k : int = 64
+    attention_type : str = "MHA"
 
     def setup(self):
         ## We first have the pre-ambulatory initialization.
-        self.mha = VanillaMHA(hidden_dim=self.hidden_dim, head_dim=self.head_dim, num_heads=self.num_heads, 
-                              dropout=self.dropout, mask=False)
+        if self.attention_type == "PerfMHA":
+            self.mha = PerfMHA(hidden_dim=self.hidden_dim, head_dim=self.head_dim, num_heads=self.num_heads, 
+                                dropout=self.dropout, mask=False)
+        elif self.attention_type == "LinMHA":
+            self.mha = LinMHA(hidden_dim=self.hidden_dim, head_dim=self.head_dim, num_heads=self.num_heads, 
+                                dropout=self.dropout, mask=False, sequence_length=self.sequence_length, downsampling_k=self.downsampling_k)
+        elif self.attention_type == "CompMHA":
+            self.mha = CompMHA(hidden_dim=self.hidden_dim, head_dim=self.head_dim, num_heads=self.num_heads, 
+                                dropout=self.dropout, mask=False, sequence_length=self.sequence_length, downsampling_k=self.downsampling_k)
+        else: ## We default to vanilla attention.
+            self.mha = VanillaMHA(hidden_dim=self.hidden_dim, head_dim=self.head_dim, num_heads=self.num_heads, 
+                                dropout=self.dropout, mask=False)
 
         self.dense_expand = nn.Dense(self.ffn_size)
         self.dense_contract = nn.Dense(self.hidden_dim)
@@ -92,11 +107,14 @@ class Encoder(nn.Module):
     sequence_length : int
     ffn_size : int
     encoder_layers : int
+    downsampling_k : int = 64
+    attention_type : str = "MHA"
 
     def setup(self):
         self.encoders = [EncoderLayer(self.hidden_dim, self.head_dim, 
                                         self.num_heads, self.dropout, 
-                                        self.sequence_length, self.ffn_size) for _ in range(self.encoder_layers)]
+                                        self.sequence_length, self.ffn_size, 
+                                        self.downsampling_k, self.attention_type) for _ in range(self.encoder_layers)]
 
     def __call__(self, x, *, train):
         for enc in self.encoders:
@@ -111,13 +129,38 @@ class DecoderLayer(nn.Module):
     dropout : float
     sequence_length : int
     ffn_size : int
+    downsampling_k : int = 64
+    attention_type : str = "MHA"
 
     def setup(self):
-        self.masked_mha = VanillaMHA(hidden_dim=self.hidden_dim, head_dim=self.head_dim, num_heads=self.num_heads, 
-                                     dropout=self.dropout, mask=True)
-            
-        self.enc_dec_mha = VanillaMHA(hidden_dim=self.hidden_dim, head_dim=self.head_dim, num_heads=self.num_heads, 
-                                        dropout=self.dropout, mask=False)
+        if self.attention_type == "PerfMHA":
+            self.masked_mha = PerfMHA(hidden_dim=self.hidden_dim, head_dim=self.head_dim, num_heads=self.num_heads, 
+                                        dropout=self.dropout, mask=True)
+                
+            self.enc_dec_mha = PerfMHA(hidden_dim=self.hidden_dim, head_dim=self.head_dim, num_heads=self.num_heads, 
+                                            dropout=self.dropout, mask=False)
+        elif self.attention_type == "LinMHA":
+            self.masked_mha = LinMHA(hidden_dim=self.hidden_dim, head_dim=self.head_dim, num_heads=self.num_heads, 
+                                        dropout=self.dropout, mask=True, sequence_length=self.sequence_length, 
+                                        downsampling_k=self.downsampling_k)
+                
+            self.enc_dec_mha = LinMHA(hidden_dim=self.hidden_dim, head_dim=self.head_dim, num_heads=self.num_heads, 
+                                            dropout=self.dropout, mask=False, sequence_length=self.sequence_length,
+                                            downsampling_k=self.downsampling_k)
+        elif self.attention_type == "CompMHA":
+            self.masked_mha = CompMHA(hidden_dim=self.hidden_dim, head_dim=self.head_dim, num_heads=self.num_heads, 
+                                        dropout=self.dropout, mask=True, sequence_length=self.sequence_length, 
+                                        downsampling_k=self.downsampling_k)
+                
+            self.enc_dec_mha = CompMHA(hidden_dim=self.hidden_dim, head_dim=self.head_dim, num_heads=self.num_heads, 
+                                            dropout=self.dropout, mask=False, sequence_length=self.sequence_length,
+                                            downsampling_k=self.downsampling_k)
+        else: ## Default to Vanilla Attention.
+            self.masked_mha = VanillaMHA(hidden_dim=self.hidden_dim, head_dim=self.head_dim, num_heads=self.num_heads, 
+                                        dropout=self.dropout, mask=True)
+                
+            self.enc_dec_mha = VanillaMHA(hidden_dim=self.hidden_dim, head_dim=self.head_dim, num_heads=self.num_heads, 
+                                            dropout=self.dropout, mask=False)
 
         self.dense_expand = nn.Dense(self.ffn_size)
         self.dense_contract = nn.Dense(self.hidden_dim)
@@ -163,10 +206,12 @@ class Decoder(nn.Module):
     sequence_length : int
     ffn_size : int
     decoder_layers : int
+    downsampling_k : int = 64
+    attention_type : str = "MHA"
 
     def setup(self):
         self.decoders = [DecoderLayer(self.hidden_dim, self.head_dim, self.num_heads, 
-                                        self.dropout, self.sequence_length, self.ffn_size) for _ in range(self.decoder_layers)]
+                                        self.dropout, self.sequence_length, self.ffn_size, self.downsampling_k, self.attention_type) for _ in range(self.decoder_layers)]
 
     ## x should be a list: [encoder_input, decoder_input]
     def __call__(self, x, *, train):
@@ -187,17 +232,19 @@ class Transformer(nn.Module):
     num_layers : int
     vocabulary_size : int
     encoder_only : bool
+    downsampling_k : int = 64 ## Default this to 64.
+    attention_type : str = "MHA" ## Default this to vanilla attention.
 
     def setup(self):
         self.positional_embedding = PositionalEmbedding(self.vocabulary_size, self.hidden_dim, self.dropout)
 
         self.encoder = Encoder(self.hidden_dim, self.head_dim, self.num_heads, 
                                self.dropout, self.sequence_length, self.ffn_size, 
-                               self.num_layers)
+                               self.num_layers, self.downsampling_k, self.attention_type)
 
         self.decoder = Decoder(self.hidden_dim, self.head_dim, self.num_heads, 
                                self.dropout, self.sequence_length, self.ffn_size, 
-                               self.num_layers)
+                               self.num_layers, self.downsampling_k, self.attention_type)
 
         self.last_ffn = nn.Dense(self.vocabulary_size)
 
@@ -215,7 +262,6 @@ class Transformer(nn.Module):
             decoder_output = self.decoder([encoder_output, decoder_input], train=train)
             return decoder_output 
 
-"""
 ## This section is for unit testing all my code.
 import jax.numpy as jnp
 from jax import random
@@ -228,19 +274,20 @@ sequence_length = 4
 ffn_size = 10
 num_layers = 2
 vocabulary_size = 10
-
+attnetion_type = "MHA"
+downsampling_k = 3
 batch_size = 2
 
-transformer = Transformer(hidden_dim, head_dim, num_heads, 0.1, sequence_length, ffn_size, num_layers, vocabulary_size, False)
+transformer = Transformer(hidden_dim, head_dim, num_heads, 0.1, sequence_length, ffn_size, num_layers, vocabulary_size, True, downsampling_k, attnetion_type)
 param_key = random.PRNGKey(42)
 dropout_key = random.PRNGKey(43)
 enc_input = jnp.round(random.uniform(random.PRNGKey(44), (batch_size, sequence_length)) * vocabulary_size).astype(jnp.int32)
 dec_input = jnp.round(random.uniform(random.PRNGKey(45), (batch_size, sequence_length)) * vocabulary_size).astype(jnp.int32)
-params = transformer.init({'params': param_key, 'dropout': dropout_key}, [enc_input, dec_input], train=True)
+params = transformer.init({'params': param_key, 'dropout': dropout_key}, enc_input, dec_input, train=True)
 
 ## One thing to keep note is that a new dropout_key must constantly be passed into the function.
 last_dropout_key = dropout_key
 for _ in range(2):
-    attention_mat = transformer.apply(params, [enc_input, dec_input], train=True, rngs={'dropout': dropout_key})
+    attention_mat = transformer.apply(params, enc_input, dec_input, train=True, rngs={'dropout': dropout_key})
+    print(attention_mat)
     last_dropout_key = random.split(last_dropout_key)[1]
-"""
