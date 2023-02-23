@@ -134,7 +134,7 @@ else: ## Otherwise we create a checkpoint. ##
     checkpoints.save_checkpoint(ckpt_dir=checkpoint_path, target=state, step=ckpt_count)
     print('checkpoint succesfully created.', flush=True)
 
-def train_step(parameters, inp, tar_inp, data_real, train, weights, dropout_key, opt_state, optimizer):
+def train_step(parameters, inp, tar_inp, data_real, train, weights, dropout_key, opt_state, optimizer, batch_number):
     @partial(jax.jit, static_argnames=['train'])
     def compute_loss(parameters, inp, tar_inp, train, dropout_key, real, weights):
         logits = masked_lm.apply(parameters, inp, tar_inp, train=train, rngs={'dropout': dropout_key})
@@ -148,10 +148,14 @@ def train_step(parameters, inp, tar_inp, data_real, train, weights, dropout_key,
     updates, opt_state = optimizer.update(grads, opt_state, parameters)
     params = optax.apply_updates(parameters, updates)
 
+    ## We clear the cache at the end. ##
+    if batch_number % 50 == 0:
+        compute_loss._clear_cache()
+
     ## Returns the tuple of: (new model parameters, optimizer state, loss).
     return params, opt_state, loss
 
-def val_step(parameters, inp, tar_inp, data_real, train, weights, dropout_key):
+def val_step(parameters, inp, tar_inp, data_real, train, weights, dropout_key, batch_number):
 
     @partial(jax.jit, static_argnames=['train'])
     def compute_loss(parameters, inp, tar_inp, train, dropout_key, real, weights):
@@ -163,6 +167,9 @@ def val_step(parameters, inp, tar_inp, data_real, train, weights, dropout_key):
         return loss.sum() / jnp.sum(weights)      
 
     loss = compute_loss(parameters, inp, tar_inp, train, dropout_key, data_real, weights) 
+    
+    if batch_number % 50 == 0:
+        compute_loss._clear_cache()
 
     return loss
 
@@ -189,7 +196,7 @@ for epoch in range(EPOCHS):
             inp = inp[:, 1:]
 
         ## Finally, call one train_step. ##
-        params, opt_state, loss = train_step(params, inp, tar_inp, tar_real, True, weight[:, 1:], dropout_key, opt_state, optimizer)
+        params, opt_state, loss = train_step(params, inp, tar_inp, tar_real, True, weight[:, 1:], dropout_key, opt_state, optimizer, batch)
         loss_accum += loss
         print(f'Epoch: {epoch + 1} Batch: {batch+1} Loss: {loss_accum/float(batch+1):.3f}', flush=True)
 
