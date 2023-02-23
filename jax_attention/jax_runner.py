@@ -134,43 +134,23 @@ else: ## Otherwise we create a checkpoint. ##
     checkpoints.save_checkpoint(ckpt_dir=checkpoint_path, target=state, step=ckpt_count)
     print('checkpoint succesfully created.', flush=True)
 
-def train_step(parameters, inp, tar_inp, data_real, train, weights, dropout_key, opt_state, optimizer, batch_number):
-    @partial(jax.jit, static_argnames=['train'])
-    def compute_loss(parameters, inp, tar_inp, train, dropout_key, real, weights):
-        logits = masked_lm.apply(parameters, inp, tar_inp, train=train, rngs={'dropout': dropout_key})
+@partial(jax.jit, static_argnames=['train'])
+def compute_loss(parameters, inp, tar_inp, train, dropout_key, real, weights):
+    logits = masked_lm.apply(parameters, inp, tar_inp, train=train, rngs={'dropout': dropout_key})
+    ## TODO, is this the correct way to implement MLM? How can I know if this is correct?
+    loss = optax.softmax_cross_entropy_with_integer_labels(logits, real)
+    loss *= weights
+    return loss.sum() / jnp.sum(weights) 
 
-        ## TODO, is this the correct way to implement MLM? How can I know if this is correct?
-        loss = optax.softmax_cross_entropy_with_integer_labels(logits, real)
-        loss *= weights
-        return loss.sum() / jnp.sum(weights) 
-    
+def train_step(parameters, inp, tar_inp, data_real, train, weights, dropout_key, opt_state, optimizer, batch_number):
     loss, grads = value_and_grad(compute_loss)(parameters, inp, tar_inp, train, dropout_key, data_real, weights)
     updates, opt_state = optimizer.update(grads, opt_state, parameters)
     params = optax.apply_updates(parameters, updates)
-
-    ## We clear the cache at the end. ##
-    if batch_number % 50 == 0:
-        compute_loss._clear_cache()
-
     ## Returns the tuple of: (new model parameters, optimizer state, loss).
     return params, opt_state, loss
 
 def val_step(parameters, inp, tar_inp, data_real, train, weights, dropout_key, batch_number):
-
-    @partial(jax.jit, static_argnames=['train'])
-    def compute_loss(parameters, inp, tar_inp, train, dropout_key, real, weights):
-        logits = masked_lm.apply(parameters, inp, tar_inp, train=train, rngs={'dropout': dropout_key})
-
-        ## TODO, is this the correct way to implement MLM? How can I know if this is correct?
-        loss = optax.softmax_cross_entropy_with_integer_labels(logits, real)
-        loss *= weights
-        return loss.sum() / jnp.sum(weights)      
-
     loss = compute_loss(parameters, inp, tar_inp, train, dropout_key, data_real, weights) 
-    
-    if batch_number % 50 == 0:
-        compute_loss._clear_cache()
-
     return loss
 
 ## Over here, we have the main training loop. ##
