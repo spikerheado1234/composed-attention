@@ -32,9 +32,8 @@ parser.add_argument('--learning_rate', dest='lr_rate', type=float, default=0.000
 args = parser.parse_args()
 param_key = random.PRNGKey(42)
 dropout_key = random.PRNGKey(43)
-enc_input = jnp.round(random.uniform(random.PRNGKey(44), (args.batch_size, args.sequence_length)) * Constants.wiki_vocab_size).astype(jnp.int32)
-dec_input = jnp.round(random.uniform(random.PRNGKey(45), (args.batch_size, args.sequence_length)) * Constants.wiki_vocab_size).astype(jnp.int32)
-
+enc_input = jnp.round(random.uniform(random.PRNGKey(44), (args.batch_size, (args.sequence_length -1) if args.enc_only else args.sequence_length)) * Constants.wiki_vocab_size).astype(jnp.int32)
+dec_input = jnp.round(random.uniform(random.PRNGKey(45), (args.batch_size, (args.sequence_length - 1) if args.enc_only else args.sequence_length)) * Constants.wiki_vocab_size).astype(jnp.int32)
 from functools import partial
 import flax.linen as nn
 from flax.training import checkpoints, train_state
@@ -107,7 +106,7 @@ def create_lr_schedule(peak_lr, warmup_steps, total_step_count):
         optax.linear_schedule(init_value=peak_lr, end_value=0.0, transition_steps=rem_steps)
     ], [warmup_steps])
 
-transformer = Transformer(d_model, int(d_model / num_attention_heads), num_attention_heads, dropout_rate, args.sequence_length, dff, num_layers, Constants.wiki_vocab_size, args.enc_only, args.downsampling_k, args.attention_type)
+transformer = Transformer(d_model, int(d_model / num_attention_heads), num_attention_heads, dropout_rate, (args.sequence_length - 1) if args.enc_only else args.sequence_length, dff, num_layers, Constants.wiki_vocab_size, args.enc_only, args.downsampling_k, args.attention_type)
 
 ## We have to first initialize the model & optimizer. ##
 masked_lm = MaskedLM(transformer, Constants.wiki_vocab_size)
@@ -202,7 +201,7 @@ for epoch in range(EPOCHS):
         ## Refresh the dropout_key as well.## 
         dropout_key = random.split(dropout_key)[1]
         ## Lastly, we call the validation function. ##
-        loss = val_step(params, inp, tar_inp, tar_real, False, weight[:, 1:], dropout_key)
+        loss = val_step(params, inp, tar_inp, tar_real, False, weight[:, 1:], dropout_key, batch)
         total_val_loss += loss
         num_batches += 1
 

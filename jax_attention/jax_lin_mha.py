@@ -51,7 +51,6 @@ class MHA(nn.Module):
         ## Jax complains about passing in multiple arguments.
         ## So we do the hack of concatenating the queries, keys and values into a list and unpacking it.
         query, key, value = x
-        pdb.set_trace()
         ## First, we downsample the keys and values.
         key = jnp.einsum('ks, bsd -> bkd', self.key_downsampling_mat, key)
         value = jnp.einsum('ks, bsd -> bkd', self.value_downsampling_mat, value)
