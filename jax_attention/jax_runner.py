@@ -65,9 +65,9 @@ val_batches = make_batches(val_ds, BUFFER_SIZE,BATCH_SIZE)
 
 ## Hyperparameters ##
 num_layers = args.layers
-d_model = 512
+d_model = 768
 dff = 3072
-num_attention_heads = 8
+num_attention_heads = 12
 dropout_rate = 0.1
 rank = args.rank
 learning_rate = args.lr_rate
@@ -200,10 +200,14 @@ for epoch in range(EPOCHS):
         weight = jnp.array(weight)
         ## Refresh the dropout_key as well.## 
         dropout_key = random.split(dropout_key)[1]
+        if args.enc_only:
+            inp = inp[:, 1:]
+
         ## Lastly, we call the validation function. ##
         loss = val_step(params, inp, tar_inp, tar_real, False, weight[:, 1:], dropout_key, batch)
         total_val_loss += loss
         num_batches += 1
+        
 
     total_val_loss /= float(num_batches)
     print(f'Epoch {epoch + 1} Validation-Loss: {total_val_loss:.3f}', flush=True)
