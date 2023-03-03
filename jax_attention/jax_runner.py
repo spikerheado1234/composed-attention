@@ -49,6 +49,8 @@ from stats import Stats
 
 MAX_TOKENS = args.sequence_length
 
+assert MAX_TOKENS == 128, "We must start with a sequence length of 128."
+
 ### Data preparation 
 
 curr_dir = os.getcwd() + "/"
@@ -155,6 +157,10 @@ def val_step(parameters, inp, tar_inp, data_real, train, weights, dropout_key, b
 ## Over here, we have the main training loop. ##
 EPOCHS = 15
 for epoch in range(EPOCHS):
+    ## For the last epoch, we change the sequence length to 512.
+    if epoch == EPOCHS - 1:
+        MAX_TOKENS = 512
+
     loss_accum = 0
 
     for batch, (inputs, labels) in enumerate(train_batches):

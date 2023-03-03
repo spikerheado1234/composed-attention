@@ -64,6 +64,9 @@ class MHA(nn.Module):
         ## Then we take the softmax
         attn_mat = softmax(q_ks)
 
+        ## Then we drop out the attention matrix. 
+        attn_mat = self.dropout_layer(attn_mat, deterministic=not train)
+
         ## Then we right multiply by the values and return the result.
         a_v =  jnp.einsum('bhqk, bkhd -> bqhd', attn_mat, values)
 

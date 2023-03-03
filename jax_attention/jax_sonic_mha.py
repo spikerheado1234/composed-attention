@@ -42,19 +42,33 @@ class MHA(nn.Module):
         self.numerical_stabilizer = 0.001
 
         downsampling_shape = (self.downsampling_k, self.sequence_length)
+        downsampling_shape_128 = (self.downsampling_k, 128)
+        downsampling_shape_512 = (self.downsampling_k, 512)
         mean = 0.0
         sd = float(1)/float(self.downsampling_k)
-        ## TODO, verify if these two matrixes are DIFFERENT.
-        self.key_downsampling_mat = self.param('key_downsample_mat', lambda rng, shape, mean, sd: mean + sd * jax.random.normal(rng, shape=shape), downsampling_shape, mean, sd)
-        self.value_downsampling_mat = self.param('value_downsample_mat', lambda rng, shape, mean, sd: mean + sd * jax.random.normal(rng, shape=shape), downsampling_shape, mean, sd)
+
+        self.key_downsampling_mat_128 = self.param('key_downsample_mat', lambda rng, shape, mean, sd: mean + sd * jax.random.normal(rng, shape=shape), downsampling_shape_128, mean, sd)
+        self.key_downsampling_mat_512 = self.param('key_downsample_mat', lambda rng, shape, mean, sd: mean + sd * jax.random.normal(rng, shape=shape), downsampling_shape_512, mean, sd)
+        self.value_downsampling_mat_128 = self.param('value_downsample_mat', lambda rng, shape, mean, sd: mean + sd * jax.random.normal(rng, shape=shape), downsampling_shape_128, mean, sd)
+        self.value_downsampling_mat_512 = self.param('value_downsample_mat', lambda rng, shape, mean, sd: mean + sd * jax.random.normal(rng, shape=shape), downsampling_shape_512, mean, sd)
+
+        ## Dropout layers.
+        self.dropout_layer = nn.Dropout(0.1)
 
     def __call__(self, x, *, train): 
         ## Jax complains about passing in multiple arguments.
         ## So we do the hack of concatenating the queries, keys and values into a list and unpacking it.
         query, key, value = x
 
-        key = jnp.einsum('ks, bsd -> bkd', self.key_downsampling_mat, key)
-        value = jnp.einsum('ks, bsd -> bkd', self.value_downsampling_mat, value)
+        assert len(x.shape) == 3, "Incorrect size of input, should be [batch, seq length, hidden dimension]"
+        if x.shape[1] == 128:
+            key = jnp.einsum('ks, bsd -> bkd', self.key_downsampling_mat_128, key)
+            value = jnp.einsum('ks, bsd -> bkd', self.value_downsampling_mat_128, value)
+        elif x.shape[1] == 512:
+            key = jnp.einsum('ks, bsd -> bkd', self.key_downsampling_mat_512, key)
+            value = jnp.einsum('ks, bsd -> bkd', self.value_downsampling_mat_512, value)
+        else:
+            raise Exception("Input sequence length must be of size 128 or 512.")
 
         ## First, we map the queries keys and values.
         queries = jnp.einsum('bsd, dnh -> bsnh', query, self.query_kernel)
@@ -72,6 +86,8 @@ class MHA(nn.Module):
 
             ## Then we take the softmax
             attn_mat = softmax(q_ks)
+
+            attn_mat = self.dropout_layer(attn_mat, deterministic=not train)
 
             ## Then we right multiply by the values and return the result.
             a_v =  jnp.einsum('bhqk, bkhd -> bqhd', attn_mat, values)

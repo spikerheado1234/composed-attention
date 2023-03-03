@@ -51,6 +51,7 @@ class EncoderLayer(nn.Module):
 
     def setup(self):
         ## We first have the pre-ambulatory initialization.
+        pdb.set_trace()
         if self.attention_type == "PerfMHA":
             self.mha = PerfMHA(hidden_dim=self.hidden_dim, head_dim=self.head_dim, num_heads=self.num_heads, 
                                 dropout=self.dropout, mask=False)
@@ -73,25 +74,20 @@ class EncoderLayer(nn.Module):
 
         ## We need three dropout layers.
         self.dropout_one = nn.Dropout(self.dropout)
-        self.dropout_two = nn.Dropout(self.dropout)
-        self.dropout_three = nn.Dropout(self.dropout)
 
     def __call__(self, x, *, train):
         queries, keys, values = x, x, x
 
         ## we first compute the attention value.
         attn = self.mha([queries, keys, values], train=train)
-        ## We drop out the values of attn.
-        attn = self.dropout_one(attn, deterministic=not train)
 
         ## Then we have to compute the layer norm of the addition.
         attn_prev_ffn = self.layer_norm_one(attn + x)
 
         ## Then we have to put it through a dense ffn Layer.
         attn = self.dense_expand(attn_prev_ffn)
-        attn = self.dropout_two(attn, deterministic=not train)
         attn = self.dense_contract(attn)
-        attn = self.dropout_three(attn, deterministic=not train)
+        attn = self.dropout_one(attn, deterministic=not train)
 
         ## Then we have to put it through the last layer-norm.
         attn = self.layer_norm_two(attn + attn_prev_ffn)
@@ -166,9 +162,6 @@ class DecoderLayer(nn.Module):
         self.dense_contract = nn.Dense(self.hidden_dim)
 
         self.dropout_one = nn.Dropout(rate=self.dropout)
-        self.dropout_two = nn.Dropout(rate=self.dropout)
-        self.dropout_three = nn.Dropout(rate=self.dropout)
-        self.dropout_four = nn.Dropout(rate=self.dropout)
 
         ## Three layernorms required
         self.layer_norm_one = nn.LayerNorm()
@@ -181,19 +174,16 @@ class DecoderLayer(nn.Module):
 
         ## This is the Masked Attention.
         attn_output_masked = self.masked_mha([decoder_input, decoder_input, decoder_input], train=train)
-        attn_output_masked = self.dropout_one(attn_output_masked, deterministic=not train)
         attn_output_masked = self.layer_norm_one(decoder_input + attn_output_masked)
 
         ## This is the Enc-Dec Attention.
         attn_output = self.enc_dec_mha([attn_output_masked, encoder_input, encoder_input], train=train)
-        attn_output = self.dropout_two(attn_output, deterministic=not train)
         attn_output = self.layer_norm_two(attn_output + attn_output_masked)
 
         ## Lastly, the feed forward network.
         attn_ffn = self.dense_expand(attn_output)
-        attn_ffn = self.dropout_three(attn_ffn, deterministic=not train)
         attn_ffn = self.dense_contract(attn_ffn)
-        attn_ffn = self.dropout_four(attn_ffn, deterministic=not train)
+        attn_ffn = self.dropout_one(attn_ffn, deterministic=not train)
         attn_ffn = self.layer_norm_three(attn_ffn + attn_output)
 
         return attn_ffn
@@ -275,7 +265,7 @@ sequence_length = 4
 ffn_size = 10
 num_layers = 2
 vocabulary_size = 10
-attnetion_type = "MHA"
+attnetion_type = "PerfMHA"
 downsampling_k = 3
 batch_size = 2
 
