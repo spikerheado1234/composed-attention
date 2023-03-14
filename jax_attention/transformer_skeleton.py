@@ -51,7 +51,6 @@ class EncoderLayer(nn.Module):
 
     def setup(self):
         ## We first have the pre-ambulatory initialization.
-        pdb.set_trace()
         if self.attention_type == "PerfMHA":
             self.mha = PerfMHA(hidden_dim=self.hidden_dim, head_dim=self.head_dim, num_heads=self.num_heads, 
                                 dropout=self.dropout, mask=False)

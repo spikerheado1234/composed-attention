@@ -42,15 +42,15 @@ class MHA(nn.Module):
         self.numerical_stabilizer = 0.001
 
         downsampling_shape = (self.downsampling_k, self.sequence_length)
-        downsampling_shape_128 = (self.downsampling_k, 128)
-        downsampling_shape_512 = (self.downsampling_k, 512)
+        downsampling_shape_128 = (self.downsampling_k if self.downsampling_k < 128 else 64, 128)
+        downsampling_shape_512 = (self.downsampling_k if self.downsampling_k < 512 else 256, 512)
         mean = 0.0
         sd = float(1)/float(self.downsampling_k)
 
-        self.key_downsampling_mat_128 = self.param('key_downsample_mat', lambda rng, shape, mean, sd: mean + sd * jax.random.normal(rng, shape=shape), downsampling_shape_128, mean, sd)
-        self.key_downsampling_mat_512 = self.param('key_downsample_mat', lambda rng, shape, mean, sd: mean + sd * jax.random.normal(rng, shape=shape), downsampling_shape_512, mean, sd)
-        self.value_downsampling_mat_128 = self.param('value_downsample_mat', lambda rng, shape, mean, sd: mean + sd * jax.random.normal(rng, shape=shape), downsampling_shape_128, mean, sd)
-        self.value_downsampling_mat_512 = self.param('value_downsample_mat', lambda rng, shape, mean, sd: mean + sd * jax.random.normal(rng, shape=shape), downsampling_shape_512, mean, sd)
+        self.key_downsampling_mat_128 = self.param('key_downsample_mat_128', lambda rng, shape, mean, sd: mean + sd * jax.random.normal(rng, shape=shape), downsampling_shape_128, mean, sd)
+        self.key_downsampling_mat_512 = self.param('key_downsample_mat_512', lambda rng, shape, mean, sd: mean + sd * jax.random.normal(rng, shape=shape), downsampling_shape_512, mean, sd)
+        self.value_downsampling_mat_128 = self.param('value_downsample_mat_128', lambda rng, shape, mean, sd: mean + sd * jax.random.normal(rng, shape=shape), downsampling_shape_128, mean, sd)
+        self.value_downsampling_mat_512 = self.param('value_downsample_mat_512', lambda rng, shape, mean, sd: mean + sd * jax.random.normal(rng, shape=shape), downsampling_shape_512, mean, sd)
 
         ## Dropout layers.
         self.dropout_layer = nn.Dropout(0.1)
@@ -60,11 +60,11 @@ class MHA(nn.Module):
         ## So we do the hack of concatenating the queries, keys and values into a list and unpacking it.
         query, key, value = x
 
-        assert len(x.shape) == 3, "Incorrect size of input, should be [batch, seq length, hidden dimension]"
-        if x.shape[1] == 128:
+        assert len(key.shape) == 3 and len(value.shape) == 3 and key.shape[1] == value.shape[1], "Incorrect size of input, should be [batch, seq length, hidden dimension]"
+        if key.shape[1] == 128:
             key = jnp.einsum('ks, bsd -> bkd', self.key_downsampling_mat_128, key)
             value = jnp.einsum('ks, bsd -> bkd', self.value_downsampling_mat_128, value)
-        elif x.shape[1] == 512:
+        elif key.shape[1] == 512:
             key = jnp.einsum('ks, bsd -> bkd', self.key_downsampling_mat_512, key)
             value = jnp.einsum('ks, bsd -> bkd', self.value_downsampling_mat_512, value)
         else:

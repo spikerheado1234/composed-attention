@@ -32,8 +32,8 @@ parser.add_argument('--learning_rate', dest='lr_rate', type=float, default=0.000
 args = parser.parse_args()
 param_key = random.PRNGKey(42)
 dropout_key = random.PRNGKey(43)
-enc_input = jnp.round(random.uniform(random.PRNGKey(44), (args.batch_size, (args.sequence_length -1) if args.enc_only else args.sequence_length)) * Constants.wiki_vocab_size).astype(jnp.int32)
-dec_input = jnp.round(random.uniform(random.PRNGKey(45), (args.batch_size, (args.sequence_length - 1) if args.enc_only else args.sequence_length)) * Constants.wiki_vocab_size).astype(jnp.int32)
+enc_input = jnp.round(random.uniform(random.PRNGKey(44), (args.batch_size,args.sequence_length)) * Constants.wiki_vocab_size).astype(jnp.int32)
+dec_input = jnp.round(random.uniform(random.PRNGKey(45), (args.batch_size, args.sequence_length)) * Constants.wiki_vocab_size).astype(jnp.int32)
 from functools import partial
 import flax.linen as nn
 from flax.training import checkpoints, train_state
@@ -139,9 +139,9 @@ else: ## Otherwise we create a checkpoint. ##
 def compute_loss(parameters, inp, tar_inp, train, dropout_key, real, weights):
     logits = masked_lm.apply(parameters, inp, tar_inp, train=train, rngs={'dropout': dropout_key})
     ## TODO, is this the correct way to implement MLM? How can I know if this is correct?
-    loss = optax.softmax_cross_entropy_with_integer_labels(logits, real)
-    loss *= weights
-    return loss.sum() / jnp.sum(weights) 
+    loss = optax.softmax_cross_entropy_with_integer_labels(logits[:, 1:], real)
+    loss *= weights[:, 1:]
+    return loss.sum() / jnp.sum(weights[:, 1:]) 
 
 def train_step(parameters, inp, tar_inp, data_real, train, weights, dropout_key, opt_state, optimizer, batch_number):
     loss, grads = value_and_grad(compute_loss)(parameters, inp, tar_inp, train, dropout_key, data_real, weights)
@@ -160,7 +160,7 @@ for epoch in range(EPOCHS):
     ## For the last epoch, we change the sequence length to 512.
     if epoch == EPOCHS - 1:
         MAX_TOKENS = 512
-
+    
     loss_accum = 0
 
     for batch, (inputs, labels) in enumerate(train_batches):
@@ -177,11 +177,8 @@ for epoch in range(EPOCHS):
         weight = jnp.array(weight)
         ## Refresh the dropout_key as well.## 
         dropout_key = random.split(dropout_key)[1]
-        if args.enc_only:
-            inp = inp[:, 1:]
-
         ## Finally, call one train_step. ##
-        params, opt_state, loss = train_step(params, inp, tar_inp, tar_real, True, weight[:, 1:], dropout_key, opt_state, optimizer, batch)
+        params, opt_state, loss = train_step(params, inp, tar_inp, tar_real, True, weight, dropout_key, opt_state, optimizer, batch)
         loss_accum += loss
         print(f'Epoch: {epoch + 1} Batch: {batch+1} Loss: {loss_accum/float(batch+1):.3f}', flush=True)
 
@@ -206,11 +203,9 @@ for epoch in range(EPOCHS):
         weight = jnp.array(weight)
         ## Refresh the dropout_key as well.## 
         dropout_key = random.split(dropout_key)[1]
-        if args.enc_only:
-            inp = inp[:, 1:]
 
         ## Lastly, we call the validation function. ##
-        loss = val_step(params, inp, tar_inp, tar_real, False, weight[:, 1:], dropout_key, batch)
+        loss = val_step(params, inp, tar_inp, tar_real, False, weight, dropout_key, batch)
         total_val_loss += loss
         num_batches += 1
         

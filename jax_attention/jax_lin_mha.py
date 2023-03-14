@@ -41,16 +41,16 @@ class MHA(nn.Module):
 
         ## We initialize the downsampling values here.
         downsampling_shape = (self.downsampling_k, self.sequence_length) ## This is no longer required. Remove later.
-        downsampling_shape_128 = (self.downsampling_k, 128)
-        downsampling_shape_512 = (self.downsampling_k, 512)
+        downsampling_shape_128 = (self.downsampling_k if self.downsampling_k < 128 else 64, 128)
+        downsampling_shape_512 = (self.downsampling_k if self.downsampling_k < 512 else 256, 512)
         mean = 0.0
         sd = float(1)/float(self.downsampling_k)
 
         ## Here, we have to provide three such constructions.
-        self.key_downsampling_mat_128 = self.param('key_downsample_mat', lambda rng, shape, mean, sd: mean + sd * jax.random.normal(rng, shape=shape), downsampling_shape_128, mean, sd)
-        self.key_downsampling_mat_512 = self.param('key_downsample_mat', lambda rng, shape, mean, sd: mean + sd * jax.random.normal(rng, shape=shape), downsampling_shape_512, mean, sd)
-        self.value_downsampling_mat_128 = self.param('value_downsample_mat', lambda rng, shape, mean, sd: mean + sd * jax.random.normal(rng, shape=shape), downsampling_shape_128, mean, sd)
-        self.value_downsampling_mat_512 = self.param('value_downsample_mat', lambda rng, shape, mean, sd: mean + sd * jax.random.normal(rng, shape=shape), downsampling_shape_512, mean, sd)
+        self.key_downsampling_mat_128 = self.param('key_downsample_mat_128', lambda rng, shape, mean, sd: mean + sd * jax.random.normal(rng, shape=shape), downsampling_shape_128, mean, sd)
+        self.key_downsampling_mat_512 = self.param('key_downsample_mat_512', lambda rng, shape, mean, sd: mean + sd * jax.random.normal(rng, shape=shape), downsampling_shape_512, mean, sd)
+        self.value_downsampling_mat_128 = self.param('value_downsample_mat_128', lambda rng, shape, mean, sd: mean + sd * jax.random.normal(rng, shape=shape), downsampling_shape_128, mean, sd)
+        self.value_downsampling_mat_512 = self.param('value_downsample_mat_512', lambda rng, shape, mean, sd: mean + sd * jax.random.normal(rng, shape=shape), downsampling_shape_512, mean, sd)
 
         ## Here, we have a dropout layer.
         self.dropout_layer = nn.Dropout(0.1)
@@ -62,11 +62,11 @@ class MHA(nn.Module):
         ## First, we downsample the keys and values.
 
         ## First we check the sequence length of x.
-        assert len(x.shape) == 3, "Incorrect size of input"
-        if x.shape[1] == 128:
+        assert len(key.shape) == 3 and len(value.shape) == 3 and key.shape[1] == value.shape[1], "Incorrect size of input"
+        if key.shape[1] == 128:
             key = jnp.einsum('ks, bsd -> bkd', self.key_downsampling_mat_128, key)
             value = jnp.einsum('ks, bsd -> bkd', self.value_downsampling_mat_128, value)
-        elif x.shape[1] == 512:
+        elif key.shape[1] == 512:
             key = jnp.einsum('ks, bsd -> bkd', self.key_downsampling_mat_512, key)
             value = jnp.einsum('ks, bsd -> bkd', self.value_downsampling_mat_512, value)
         else:
