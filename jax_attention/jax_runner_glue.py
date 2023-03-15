@@ -412,15 +412,15 @@ def compute_loss(parameters, inp, tar_inp, train, dropout_key, real, weights):
     loss *= weights
     return loss.sum() / weights.sum()
 
-def compute_wnli_accuracy(logits, real):
+def compute_wnli_accuracy(logits, real, weights):
     raise Exception("Not implemented yet.")
 
-def compute_binary_accuracy(logits, real):
+def compute_binary_accuracy(logits, real, weights):
     ## We take the first token's output and compare it to real.
-    logits = logits[:, :1]
     logits = jnp.argmax(logits, axis=-1)
     accuracy = jnp.where(logits == real, 1, 0)
-    return jnp.sum(accuracy) / jnp.array(real.shape[0])
+    accuracy *= weights
+    return accuracy.sum() / weights.sum()
 
 def train_step(parameters, inp, tar_inp, data_real, train, weights, dropout_key, opt_state, optimizer, batch_number):
     loss, grads = value_and_grad(compute_loss)(parameters, inp, tar_inp, train, dropout_key, data_real, weights)
@@ -434,14 +434,14 @@ def apply_model(parameters, inp, tar_inp, dropout_key):
     logits = downstream_model.apply(parameters, inp, tar_inp, train=False, rngs={'dropout': dropout_key})
     return logits
 
-def val_step(parameters, inp, tar_inp, data_real, dropout_key):
+def val_step(parameters, inp, tar_inp, data_real, dropout_key, weights):
     logits = apply_model(parameters, inp, tar_inp, dropout_key) 
 
     ## Then we compute the accuracy over here.
     if args.task == "wnli":
-        return compute_wnli_accuracy(logits, data_real)
+        return compute_wnli_accuracy(logits, data_real, weights)
     else:
-        return compute_binary_accuracy(logits, data_real)
+        return compute_binary_accuracy(logits, data_real, weights)
 
 ## Over here, we have the main training loop. ##
 EPOCHS = 4
@@ -487,7 +487,7 @@ for epoch in range(EPOCHS):
         dropout_key = random.split(dropout_key)[1]
 
         ## Lastly, we call the validation function. ##
-        accuracy = val_step(params, enc_part, dec_part, real_val, dropout_key)
+        accuracy = val_step(params, enc_part, dec_part, real_val, dropout_key, weights)
         total_val_accuracy += accuracy 
         num_batches += 1
         
