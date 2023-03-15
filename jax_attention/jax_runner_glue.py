@@ -344,8 +344,11 @@ class DownsStreamModel(nn.Module):
     def __call__(self, encoder_input, decoder_input, *, train):
         output = self.transformer(encoder_input, decoder_input, train=train)
 
-        ## TODO, need to check the other tasks as well. ##
-        output = jax.lax.cond(args.task == "mnli", self.last_ffn, self.last_ffn_binary, output)
+        ## Need to resort to this hack to compute output.
+        ## Will the gradient computation be correct as well?
+        output_one = self.last_ffn(output)
+        output_two = self.last_ffn_binary(output)
+        output = jax.lax.cond(args.task == "mnli", output_one, output_two)
         return output
 
 ## We create a triangular schedule here. ##
