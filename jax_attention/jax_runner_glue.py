@@ -333,22 +333,32 @@ num_train_steps = args.num_steps
 warmup_steps = args.warmup
 optimizer = tf.keras.optimizers.Adam(learning_rate=2e-05, beta_1=0.9, beta_2=0.999, epsilon=1e-9)
 
-class DownsStreamModel(nn.Module):
+## Resort to the hack of instantiating different models depending on whether task 
+## is binary or ternary.
+class BinaryModel(nn.Module):
     transformer : Transformer 
     vocabulary_size : int
 
     def setup(self):
-        self.last_ffn = nn.Dense(self.vocabulary_size)
         self.last_ffn_binary = nn.Dense(2)
     
     def __call__(self, encoder_input, decoder_input, *, train):
         output = self.transformer(encoder_input, decoder_input, train=train)
+        output = self.last_ffn_binary(output)
+        
+        return output
 
-        ## Need to resort to this hack to compute output.
-        ## Will the gradient computation be correct as well?
-        output_one = self.last_ffn(output)
-        output_two = self.last_ffn_binary(output)
-        output = jax.lax.cond(args.task == "mnli", lambda : output_one, lambda : output_two)
+class GeneralModel(nn.Module):
+    transformer : Transformer 
+    vocabulary_size : int
+
+    def setup(self):
+        self.last_ffn = nn.Dense(Constants.wiki_vocab_size)
+    
+    def __call__(self, encoder_input, decoder_input, *, train):
+        output = self.transformer(encoder_input, decoder_input, train=train)
+        output = self.last_ffn(output)
+        
         return output
 
 ## We create a triangular schedule here. ##
@@ -362,7 +372,10 @@ def create_lr_schedule(peak_lr, warmup_steps, total_step_count):
 transformer = Transformer(d_model, int(d_model / num_attention_heads), num_attention_heads, dropout_rate, (args.sequence_length - 1) if args.enc_only else args.sequence_length, dff, num_layers, Constants.wiki_vocab_size, args.enc_only, args.downsampling_k, args.attention_type)
 
 ## We have to first initialize the model & optimizer. ##
-downstream_model = DownsStreamModel(transformer, Constants.wiki_vocab_size)
+if args.task == "wnli":
+    downstream_model = GeneralModel(transformer, Constants.wiki_vocab_size)
+else:
+    downstream_model = BinaryModel(transformer, Constants.wiki_vocab_size)
 params = downstream_model.init({'params': param_key, 'dropout': dropout_key}, enc_input, dec_input, train=True)
 optimizer = optax.adam(create_lr_schedule(args.lr_rate, args.warmup, args.num_steps))
 opt_state = optimizer.init(params) ## TODO, check for correctness over here.
