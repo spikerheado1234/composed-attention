@@ -141,10 +141,9 @@ def prepare_sst2(inp):
     prefix = tf.convert_to_tensor(["sst2 sentence: "])
     sentence = prefix + inp['sentence']
     label = inp['label']
-    label = en_tokenizer.tokenize(tf.convert_to_tensor(label.numpy().astype('S')))
         
     inp_tok = en_tokenizer.tokenize(sentence)
-    return inp_tok.merge_dims(-2, -1).to_tensor(), label.merge_dims(-2, -1).to_tensor()
+    return inp_tok.merge_dims(-2, -1).to_tensor(), tf.reshape(label, [label.shape[0], 1])
 
 ## MRPC HELPER METHODS ##
 def prepare_mrpc(inp):
@@ -160,9 +159,8 @@ def prepare_mrpc(inp):
     sentence_two = prefix_two + sentence_two
     enc_input = tf.convert_to_tensor(sentence_one.numpy() + sentence_two.numpy())
     enc_input = en_tokenizer.tokenize(enc_input)
-    label = en_tokenizer.tokenize(tf.convert_to_tensor(label.numpy().astype('S')))
     
-    return enc_input.merge_dims(-2, -1).to_tensor(), label.merge_dims(-2, -1).to_tensor()
+    return enc_input.merge_dims(-2, -1).to_tensor(), tf.reshape(label, [label.shape[0], 1])
 
 ## QQP HELPER METHODS. ##
 def prepare_qqp(inp):
@@ -178,9 +176,8 @@ def prepare_qqp(inp):
     sentence_two = prefix_two + sentence_two
     enc_input = tf.convert_to_tensor(sentence_one.numpy() + sentence_two.numpy())
     enc_input = en_tokenizer.tokenize(enc_input)
-    label = en_tokenizer.tokenize(tf.convert_to_tensor(label.numpy().astype('S')))
     
-    return enc_input.merge_dims(-2, -1).to_tensor(), label.merge_dims(-2, -1).to_tensor()
+    return enc_input.merge_dims(-2, -1).to_tensor(), tf.reshape(label, [label.shape[0], 1])
 
 ## STSB HELPER METHODS. ##
 def prepare_stsb(inp):
@@ -378,7 +375,7 @@ def create_lr_schedule(peak_lr, warmup_steps, total_step_count):
 transformer = Transformer(d_model, int(d_model / num_attention_heads), num_attention_heads, dropout_rate, (args.sequence_length - 1) if args.enc_only else args.sequence_length, dff, num_layers, Constants.wiki_vocab_size, args.enc_only, args.downsampling_k, args.attention_type)
 
 ## We have to first initialize the model & optimizer. ##
-if args.task == "wnli":
+if args.task == "stsb":
     downstream_model = GeneralModel(transformer, Constants.wiki_vocab_size)
 else:
     downstream_model = BinaryModel(transformer, Constants.wiki_vocab_size)
@@ -412,7 +409,7 @@ def compute_loss(parameters, inp, tar_inp, train, dropout_key, real, weights):
     loss *= weights
     return loss.sum() / weights.sum()
 
-def compute_wnli_accuracy(logits, real, weights):
+def compute_stsb_accuracy(logits, real, weights):
     raise Exception("Not implemented yet.")
 
 def compute_binary_accuracy(logits, real, weights):
@@ -438,8 +435,8 @@ def val_step(parameters, inp, tar_inp, data_real, dropout_key, weights):
     logits = apply_model(parameters, inp, tar_inp, dropout_key) 
 
     ## Then we compute the accuracy over here.
-    if args.task == "wnli":
-        return compute_wnli_accuracy(logits, data_real, weights)
+    if args.task == "stsb":
+        return compute_stsb_accuracy(logits, data_real, weights)
     else:
         return compute_binary_accuracy(logits, data_real, weights)
 
