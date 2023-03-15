@@ -21,6 +21,7 @@ from flax.training import checkpoints, train_state
 from flax.core.frozen_dict import freeze
 import optax
 
+
 ## Basic command line arguments. ##
 parser = argparse.ArgumentParser(description='Train compositions of efficient Transformer Variants.')
 parser.add_argument('--type', dest='attention_type', default='MHA', choices=['MHA', 'LinMHA', 'PerfMHA', 'CompMHA'], help='The type of attention mechanism you wish to train a Transformer on. (Possible Values are: MHA, LinMHA or PerfMHA)')
@@ -49,6 +50,7 @@ import tensorflow_datasets as tfds
 
 from tokenization_proc import pad, add_start_end
 from transformer_skeleton import Transformer
+from pre_train_wiki_loader import en_tokenizer
 
 
 ## Define global vars here. ##
@@ -122,11 +124,10 @@ def prepare_cola(inp):
     prefix = tf.convert_to_tensor(['cola sentence: '])
     sentence = prefix + inp['sentence']
     label = inp['label']
-    label = en_tokenizer.tokenize(tf.convert_to_tensor(label.numpy().astype('S')))
         
     inp_tok = en_tokenizer.tokenize(sentence)
 
-    return inp_tok.merge_dims(-2, -1).to_tensor(), label.merge_dims(-2, -1).to_tensor() ## Tuple of (Tokenized input, answer)
+    return inp_tok.merge_dims(-2, -1).to_tensor(), tf.reshape(label, [label.shape[0], 1]) ## Tuple of (Tokenized input, answer)
 
 ## SST-2 HELPER METHODS. ##
 def prepare_sst2(inp):
@@ -389,7 +390,6 @@ if checkpoints.latest_checkpoint(ckpt_dir=checkpoint_path):
 
     ## Honestly, not super confident this is correct, but it's at least a start. I need to debug this
     ## extremely carefully. 
-    pdb.set_trace()
     restored_state = checkpoints.restore_checkpoint(ckpt_dir=checkpoint_path, target=None)
     unfrozen_dict = params.unfreeze()
     unfrozen_dict['params']['transformer'] = restored_state 
@@ -445,7 +445,7 @@ for epoch in range(EPOCHS):
 
     for batch, inp in enumerate(train_data):
         ## We take one train_step. ##
-
+        
         pdb.set_trace()
         ## We have to do all the pre-processing first. ##
         enc_part, dec_part = prepare_helper(inp)
