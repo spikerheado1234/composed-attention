@@ -9,6 +9,7 @@ from jax_mha import MHA as VanillaMHA
 from jax_sonic_mha import MHA as CompMHA
 from jax_lin_mha import MHA as LinMHA
 from jax_performer_mha import MHA as PerfMHA
+from jax_sonic_lin_rfa_mha import MHA as RFAMHA
 import pdb
 import math
 import jax.numpy as jnp
@@ -51,7 +52,7 @@ class EncoderLayer(nn.Module):
 
     def setup(self):
         ## We first have the pre-ambulatory initialization.
-        pdb.set_trace()
+        # pdb.set_trace()
         if self.attention_type == "PerfMHA":
             self.mha = PerfMHA(hidden_dim=self.hidden_dim, head_dim=self.head_dim, num_heads=self.num_heads, 
                                 dropout=self.dropout, mask=False)
@@ -60,6 +61,9 @@ class EncoderLayer(nn.Module):
                                 dropout=self.dropout, mask=False, sequence_length=self.sequence_length, downsampling_k=self.downsampling_k)
         elif self.attention_type == "CompMHA":
             self.mha = CompMHA(hidden_dim=self.hidden_dim, head_dim=self.head_dim, num_heads=self.num_heads, 
+                                dropout=self.dropout, mask=False, sequence_length=self.sequence_length, downsampling_k=self.downsampling_k)
+        elif self.attention_type == "RFAMHA":
+            self.mha = RFAMHA(hidden_dim=self.hidden_dim, head_dim=self.head_dim, num_heads=self.num_heads,
                                 dropout=self.dropout, mask=False, sequence_length=self.sequence_length, downsampling_k=self.downsampling_k)
         else: ## We default to vanilla attention.
             self.mha = VanillaMHA(hidden_dim=self.hidden_dim, head_dim=self.head_dim, num_heads=self.num_heads, 
@@ -151,6 +155,14 @@ class DecoderLayer(nn.Module):
             self.enc_dec_mha = CompMHA(hidden_dim=self.hidden_dim, head_dim=self.head_dim, num_heads=self.num_heads, 
                                             dropout=self.dropout, mask=False, sequence_length=self.sequence_length,
                                             downsampling_k=self.downsampling_k)
+        elif self.attention_type == "RFAMHA":
+            self.masked_mha = RFAMHA(hidden_dim=self.hidden_dim, head_dim=self.head_dim, num_heads=self.num_heads,
+                                       dropout=self.dropout, mask=True, sequence_length=self.sequence_length,
+                                       downsampling_k=self.downsampling_k)
+
+            self.enc_dec_mha = RFAMHA(hidden_dim=self.hidden_dim, head_dim = self.head_dim, num_heads=self.num_heads,
+                                          dropout=self.dropout, mask=False, sequence_length=self.sequence_length,
+                                          downsampling_k=self.downsampling_k)
         else: ## Default to Vanilla Attention.
             self.masked_mha = VanillaMHA(hidden_dim=self.hidden_dim, head_dim=self.head_dim, num_heads=self.num_heads, 
                                         dropout=self.dropout, mask=True)
@@ -259,13 +271,13 @@ from jax import random
 
 hidden_dim = 8
 head_dim = 4
-num_heads = 2 
+num_heads = 2
 dropout = 0.1
-sequence_length = 4
+sequence_length = 128
 ffn_size = 10
 num_layers = 2
 vocabulary_size = 10
-attnetion_type = "PerfMHA"
+attnetion_type = "RFAMHA"
 downsampling_k = 3
 batch_size = 2
 
