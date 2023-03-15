@@ -318,26 +318,14 @@ elif args.task == "wnli":
 else:
     raise Exception("Incorrect task specified")
 
-## We define our transformer here. ##
+## Hyperparameters ##
 num_layers = args.layers
-d_model = 256
-dff = 2048
-num_attention_heads = 8
+d_model = 768
+dff = 3072
+num_attention_heads = 12
 dropout_rate = 0.1
 rank = args.rank
-
-transformer = Transformer(
-    num_layers=num_layers,
-    d_model=d_model,
-    num_attention_heads=num_attention_heads,
-    dff=dff,
-    input_vocab_size=Constants.wiki_vocab_size,
-    target_vocab_size=Constants.wiki_vocab_size,
-    dropout_rate=dropout_rate,
-    downsampling_value=args.downsampling_k if args.attention_type == 'LinMHA' or args.attention_type == 'CompMHA' else 32, # Just default to 32 otherwise, doesn't matter since it won't be used.
-    attention_type=args.attention_type,
-    sequence_length=args.sequence_length,
-    encoder_only=args.enc_only)
+learning_rate = args.lr_rate
 
 ## Then, we create the learning rate schedule. ##
 initial_learning_rate = 0.0001
