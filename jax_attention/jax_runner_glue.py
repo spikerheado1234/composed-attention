@@ -451,7 +451,6 @@ for epoch in range(EPOCHS):
     for batch, inp in enumerate(train_data):
         ## We take one train_step. ##
         
-        pdb.set_trace()
         ## We have to do all the pre-processing first. ##
         enc_part, dec_part = prepare_helper(inp)
         enc_part, dec_part, real_val, weights = prepare_transformer_input(enc_part, dec_part)
@@ -472,7 +471,7 @@ for epoch in range(EPOCHS):
     ## Then we validate. ##
     total_val_accuracy = 0
     num_batches = 0
-    for batch, (inputs, labels) in enumerate(val_data):
+    for batch, inp in enumerate(val_data):
         
         ## We have to do all the pre-processing first. ##
         enc_part, dec_part = prepare_helper(inp)
