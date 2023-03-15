@@ -38,7 +38,7 @@ def random_project(*, x, random_matrices):
     # [1, 1, num_heads, 1]
     x, x_norm = _normalize(x)
     # [seq_len, bsz, num_heads, proj_dim]
-    x = jnp.einsum("sbhd,hkd->sbhk", x, random_matrices)
+    x = jnp.einsum("bshd,hkd->bshk", x, random_matrices)
     x_sin, x_cos = jnp.sin(x), jnp.cos(x)
 
     # [seq_len, bsz, num_heads, 2 * proj_dim]
