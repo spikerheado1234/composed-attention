@@ -193,10 +193,9 @@ def prepare_stsb(inp):
     sentence_two = prefix_two + sentence_two
     enc_input = tf.convert_to_tensor(sentence_one.numpy() + sentence_two.numpy())
     enc_input = en_tokenizer.tokenize(enc_input)
-    label = tf.cast(tf.math.round(label), dtype=tf.int64) ## We cast this simple classification by rounding to nearest integer.
-    label = en_tokenizer.tokenize(tf.convert_to_tensor(label.numpy().astype('S')))
+    label = tf.cast(tf.math.round(label), dtype=tf.int64) ## We cast this to a simple classification by rounding to nearest integer.
     
-    return enc_input.merge_dims(-2, -1).to_tensor(), label.merge_dims(-2, -1).to_tensor()
+    return enc_input.merge_dims(-2, -1).to_tensor(), tf.reshape(label, [label.shape[0], 1])
 
 ## MNLI Helper methods. ##
 def prepare_mnli(inp):
@@ -212,9 +211,8 @@ def prepare_mnli(inp):
     sentence_two = prefix_two + premise
     enc_input = tf.convert_to_tensor(sentence_one.numpy() + sentence_two.numpy())
     enc_input = en_tokenizer.tokenize(enc_input)
-    label = en_tokenizer.tokenize(label.numpy().astype('S'))
     
-    return enc_input.merge_dims(-2, -1).to_tensor(), label.merge_dims(-2, -1).to_tensor()
+    return enc_input.merge_dims(-2, -1).to_tensor(), tf.reshape(label, [label.shape[0], 1])
 
 ## QNLI helper methods. ##
 def prepare_qnli(inp):
@@ -230,9 +228,8 @@ def prepare_qnli(inp):
     sentence_two = prefix_two + sentence
     enc_input = tf.convert_to_tensor(sentence_one.numpy() + sentence_two.numpy())
     enc_input = en_tokenizer.tokenize(enc_input)
-    label = en_tokenizer.tokenize(label.numpy().astype('S'))
     
-    return enc_input.merge_dims(-2, -1).to_tensor(), label.merge_dims(-2, -1).to_tensor()
+    return enc_input.merge_dims(-2, -1).to_tensor(), tf.reshape(label, [label.shape[0], 1])
 
 ## RTE helper methods. ##
 def prepare_rte(inp):
@@ -248,9 +245,8 @@ def prepare_rte(inp):
     sentence_two = prefix_two + sentence_two
     enc_input = tf.convert_to_tensor(sentence_one.numpy() + sentence_two.numpy())
     enc_input = en_tokenizer.tokenize(enc_input)
-    label = en_tokenizer.tokenize(label.numpy().astype('S'))
     
-    return enc_input.merge_dims(-2, -1).to_tensor(), label.merge_dims(-2, -1).to_tensor()
+    return enc_input.merge_dims(-2, -1).to_tensor(), tf.reshape(label, [label.shape[0], 1])
 
 ## WNLI Helper methods. ##
 def prepare_wnli(inp):
@@ -268,7 +264,7 @@ def prepare_wnli(inp):
     enc_input = en_tokenizer.tokenize(enc_input)
     label = en_tokenizer.tokenize(label.numpy().astype('S'))
     
-    return enc_input.merge_dims(-2, -1).to_tensor(), label.merge_dims(-2, -1).to_tensor()
+    return enc_input.merge_dims(-2, -1).to_tensor(), tf.reshape(label, [label.shape[0], 1])
 
 if args.task == "cola":
     train_data = tfds.load(name="glue/cola", split="train").batch(args.batch_size)
@@ -351,6 +347,22 @@ class BinaryModel(nn.Module):
         
         return output
 
+## Resort to the hack of instantiating different models depending on whether task 
+## is binary or ternary.
+class TernaryModel(nn.Module):
+    transformer : Transformer 
+    vocabulary_size : int
+
+    def setup(self):
+        self.last_ffn_binary = nn.Dense(3)
+    
+    def __call__(self, encoder_input, decoder_input, *, train):
+        output = self.transformer(encoder_input, decoder_input, train=train)
+        output = self.last_ffn_binary(output)
+        
+        return output
+
+
 class GeneralModel(nn.Module):
     transformer : Transformer 
     vocabulary_size : int
@@ -377,6 +389,8 @@ transformer = Transformer(d_model, int(d_model / num_attention_heads), num_atten
 ## We have to first initialize the model & optimizer. ##
 if args.task == "stsb":
     downstream_model = GeneralModel(transformer, Constants.wiki_vocab_size)
+elif args.task == "mnli":
+    downstream_model = TernaryModel(transformer, Constants.wiki_vocab_size)
 else:
     downstream_model = BinaryModel(transformer, Constants.wiki_vocab_size)
 params = downstream_model.init({'params': param_key, 'dropout': dropout_key}, enc_input, dec_input, train=True)
@@ -412,7 +426,7 @@ def compute_loss(parameters, inp, tar_inp, train, dropout_key, real, weights):
 def compute_stsb_accuracy(logits, real, weights):
     raise Exception("Not implemented yet.")
 
-def compute_binary_accuracy(logits, real, weights):
+def compute_accuracy(logits, real, weights):
     ## We take the first token's output and compare it to real.
     logits = jnp.argmax(logits, axis=-1)
     accuracy = jnp.where(logits == real, 1, 0)
@@ -435,10 +449,7 @@ def val_step(parameters, inp, tar_inp, data_real, dropout_key, weights):
     logits = apply_model(parameters, inp, tar_inp, dropout_key) 
 
     ## Then we compute the accuracy over here.
-    if args.task == "stsb":
-        return compute_stsb_accuracy(logits, data_real, weights)
-    else:
-        return compute_binary_accuracy(logits, data_real, weights)
+    return compute_accuracy(logits, data_real, weights)
 
 ## Over here, we have the main training loop. ##
 EPOCHS = 4
