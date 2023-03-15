@@ -9,7 +9,8 @@ from jax_mha import MHA as VanillaMHA
 from jax_sonic_mha import MHA as CompMHA
 from jax_lin_mha import MHA as LinMHA
 from jax_performer_mha import MHA as PerfMHA
-from jax_sonic_lin_rfa_mha import MHA as RFAMHA
+from jax_sonic_lin_rfa_mha import MHA as LinRFAMHA
+from jax_rfa_mha import  MHA as RFAMHA
 import pdb
 import math
 import jax.numpy as jnp
@@ -65,8 +66,12 @@ class EncoderLayer(nn.Module):
         elif self.attention_type == "RFAMHA":
             self.mha = RFAMHA(hidden_dim=self.hidden_dim, head_dim=self.head_dim, num_heads=self.num_heads,
                                 dropout=self.dropout, mask=False, sequence_length=self.sequence_length, downsampling_k=self.downsampling_k)
+        elif self.attention_type == "LinRFAMHA":
+            self.mha = LinRFAMHA(hidden_dim=self.hidden_dim, head_dim=self.head_dim, num_heads=self.num_heads,
+                              dropout=self.dropout, mask=False, sequence_length=self.sequence_length,
+                              downsampling_k=self.downsampling_k)
         else: ## We default to vanilla attention.
-            self.mha = VanillaMHA(hidden_dim=self.hidden_dim, head_dim=self.head_dim, num_heads=self.num_heads, 
+            self.mha = VanillaMHA(hidden_dim=self.hidden_dim, head_dim=self.head_dim, num_heads=self.num_heads,
                                 dropout=self.dropout, mask=False)
 
         self.dense_expand = nn.Dense(self.ffn_size)
@@ -163,6 +168,14 @@ class DecoderLayer(nn.Module):
             self.enc_dec_mha = RFAMHA(hidden_dim=self.hidden_dim, head_dim = self.head_dim, num_heads=self.num_heads,
                                           dropout=self.dropout, mask=False, sequence_length=self.sequence_length,
                                           downsampling_k=self.downsampling_k)
+        elif self.attention_type == "LinRFAMHA":
+            self.masked_mha = LinRFAMHA(hidden_dim=self.hidden_dim, head_dim=self.head_dim, num_heads=self.num_heads,
+                                     dropout=self.dropout, mask=True, sequence_length=self.sequence_length,
+                                     downsampling_k=self.downsampling_k)
+
+            self.enc_dec_mha = LinRFAMHA(hidden_dim=self.hidden_dim, head_dim=self.head_dim, num_heads=self.num_heads,
+                                      dropout=self.dropout, mask=False, sequence_length=self.sequence_length,
+                                      downsampling_k=self.downsampling_k)
         else: ## Default to Vanilla Attention.
             self.masked_mha = VanillaMHA(hidden_dim=self.hidden_dim, head_dim=self.head_dim, num_heads=self.num_heads, 
                                         dropout=self.dropout, mask=True)
