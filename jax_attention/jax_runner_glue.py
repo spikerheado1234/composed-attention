@@ -111,9 +111,14 @@ def prepare_transformer_input(enc_part, dec_part):
     
     dec_part = add_start_end(dec_part)
     output_comparison = dec_part[:, 1:]
-    ones = np.ones(shape=(output_comparison.shape))
-    zeros = np.zeros(shape=(output_comparison.shape))
-    weights = tf.cast(tf.convert_to_tensor(np.where(output_comparison.numpy() > 5, ones, zeros)), dtype=tf.int64)
+    weights = np.zeros(output_comparison.shape)
+    weights[:, 0] = 1
+    weights = tf.convert_to_tensor(weights, dtype=tf.int64)
+
+    ## We have to make sure the last column is zero for the output_comparison.
+    output_comparison = output_comparison.numpy()
+    output_comparison[:, -1] = 0
+    output_comparison = tf.convert_to_tensor(output_comparison)
     
     return enc_part, real_dec_part, output_comparison, weights
 
@@ -399,13 +404,13 @@ else: ## Otherwise we create a checkpoint. ##
     checkpoints.save_checkpoint(ckpt_dir=checkpoint_path, target=state, step=ckpt_count)
     print('checkpoint succesfully created.', flush=True)
 
-@partial(jax.jit, static_argnames=['train'])
+##@partial(jax.jit, static_argnames=['train'])
 def compute_loss(parameters, inp, tar_inp, train, dropout_key, real, weights):
     logits = downstream_model.apply(parameters, inp, tar_inp, train=train, rngs={'dropout': dropout_key})
     ## TODO, is this the correct way to implement MLM? How can I know if this is correct?
     loss = optax.softmax_cross_entropy_with_integer_labels(logits, real)
     loss *= weights
-    return loss.sum() / jnp.sum(weights) 
+    return loss.sum() / weights.sum()
 
 def compute_wnli_accuracy(logits, real):
     raise Exception("Not implemented yet.")
