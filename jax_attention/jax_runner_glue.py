@@ -389,10 +389,10 @@ if checkpoints.latest_checkpoint(ckpt_dir=checkpoint_path):
 
     ## Honestly, not super confident this is correct, but it's at least a start. I need to debug this
     ## extremely carefully. 
-    restored_state = checkpoints.restore_checkpoint(ckpt_dir=checkpoint_path, target=state)
+    pdb.set_trace()
+    restored_state = checkpoints.restore_checkpoint(ckpt_dir=checkpoint_path, target=None)
     unfrozen_dict = params.unfreeze()
-    unfrozen_loaded_params = restored_state.params.unfreeze()
-    unfrozen_dict['params']['transformer'] = unfrozen_loaded_params
+    unfrozen_dict['params']['transformer'] = restored_state 
     params = freeze(unfrozen_dict)
     print('Latest checkpoint restored!', flush=True)
 else: ## Otherwise we create a checkpoint. ##
