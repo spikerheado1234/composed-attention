@@ -348,7 +348,7 @@ class DownsStreamModel(nn.Module):
         ## Will the gradient computation be correct as well?
         output_one = self.last_ffn(output)
         output_two = self.last_ffn_binary(output)
-        output = jax.lax.cond(args.task == "mnli", output_one, output_two)
+        output = jax.lax.cond(args.task == "mnli", lambda : output_one, lambda : output_two)
         return output
 
 ## We create a triangular schedule here. ##
