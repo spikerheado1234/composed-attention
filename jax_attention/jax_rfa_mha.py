@@ -89,16 +89,6 @@ class MHA(nn.Module):
 
         self.numerical_stabilizer = 0.001
 
-        downsampling_shape = (self.downsampling_k, self.sequence_length)
-        downsampling_shape_128 = (self.downsampling_k, 128)
-        downsampling_shape_512 = (self.downsampling_k, 512)
-        mean = 0.0
-        sd = float(1)/float(self.downsampling_k)
-
-        self.key_downsampling_mat_128 = self.param('key_downsample_mat_128', lambda rng, shape, mean, sd: mean + sd * jax.random.normal(rng, shape=shape), downsampling_shape_128, mean, sd)
-        self.key_downsampling_mat_512 = self.param('key_downsample_mat_512', lambda rng, shape, mean, sd: mean + sd * jax.random.normal(rng, shape=shape), downsampling_shape_512, mean, sd)
-        self.value_downsampling_mat_128 = self.param('value_downsample_mat_128', lambda rng, shape, mean, sd: mean + sd * jax.random.normal(rng, shape=shape), downsampling_shape_128, mean, sd)
-        self.value_downsampling_mat_512 = self.param('value_downsample_mat_512', lambda rng, shape, mean, sd: mean + sd * jax.random.normal(rng, shape=shape), downsampling_shape_512, mean, sd)
 
         # self.random_matrices = utils.load_random_matrices()
         self.random_matrices = load_random_matrices(head_dim=self.head_dim, proj_dim=self.hidden_dim)
@@ -132,8 +122,8 @@ class MHA(nn.Module):
         keys = jnp.einsum('bkd, dnh -> bknh', key, self.key_kernel)
         values = jnp.einsum('bkd, dnh -> bknh', value, self.value_kernel)
 
-        # random_matrices = self.sample_random_matrices()
-        random_matrices = self.random_matrices[0:self.num_heads, ...]
+        random_matrices = self.sample_random_matrices()
+        # random_matrices = self.random_matrices[0:self.num_heads, ...]
 
         random_matrices = build_random_matrices(random_matrices=random_matrices,
                                                 tau=self.tau,
@@ -145,10 +135,9 @@ class MHA(nn.Module):
 
         if self.mask:
             batch_size = keys.shape[0]
-            newshape = (self.sequence_length, batch_size * self.num_heads, self.head_dim)
-            phi_k = jnp.einsum("bsnh -> sbnh", keys).reshape(newshape)
-            phi_q = jnp.einsum("bsnh -> sbnh", queries).reshape(newshape)
-            v = jnp.einsum("bsnh -> sbnh", values).reshape(newshape)
+            phi_k = jnp.einsum("bsnh -> sbnh", phi_k).reshape((self.sequence_length, batch_size * self.num_heads, -1))
+            phi_q = jnp.einsum("bsnh -> sbnh", phi_q).reshape((self.sequence_length, batch_size * self.num_heads, -1))
+            v = jnp.einsum("bsnh -> sbnh", values).reshape((self.sequence_length, batch_size * self.num_heads, -1))
 
             s = jnp.einsum("sbh, sbd -> sbhd", phi_k, v)
             s = jnp.cumsum(s, axis=0)
