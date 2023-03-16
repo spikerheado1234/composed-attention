@@ -68,6 +68,7 @@ class MHA(nn.Module):
     dropout : float
     mask : bool
     sequence_length : int
+    downsampling_k : int = 64
     tau: float = 1.0
     reparam_proj: bool = False
 

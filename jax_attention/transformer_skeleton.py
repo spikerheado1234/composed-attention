@@ -11,6 +11,8 @@ from jax_lin_mha import MHA as LinMHA
 from jax_performer_mha import MHA as PerfMHA
 from jax_sonic_lin_rfa_mha import MHA as LinRFAMHA
 from jax_rfa_mha import  MHA as RFAMHA
+from jax_linear_mha import MHA as LinearMHA
+from jax_sonic_lin_linear_mha import MHA as LinLinearMHA
 import pdb
 import math
 import jax.numpy as jnp
@@ -68,8 +70,13 @@ class EncoderLayer(nn.Module):
                                 dropout=self.dropout, mask=False, sequence_length=self.sequence_length, downsampling_k=self.downsampling_k)
         elif self.attention_type == "LinRFAMHA":
             self.mha = LinRFAMHA(hidden_dim=self.hidden_dim, head_dim=self.head_dim, num_heads=self.num_heads,
-                              dropout=self.dropout, mask=False, sequence_length=self.sequence_length,
-                              downsampling_k=self.downsampling_k)
+                              dropout=self.dropout, mask=False, sequence_length=self.sequence_length, downsampling_k=self.downsampling_k)
+        elif self.attention_type == "LinearMHA":
+            self.mha = LinearMHA(hidden_dim=self.hidden_dim, head_dim=self.head_dim, num_heads=self.num_heads,
+                                dropout=self.dropout, mask=False, sequence_length=self.sequence_length, downsampling_k=self.downsampling_k)
+        elif self.attention_type == "LinLinearMHA":
+            self.mha = LinLinearMHA(hidden_dim=self.hidden_dim, head_dim=self.head_dim, num_heads=self.num_heads,
+                              dropout=self.dropout, mask=False, sequence_length=self.sequence_length, downsampling_k=self.downsampling_k)
         else: ## We default to vanilla attention.
             self.mha = VanillaMHA(hidden_dim=self.hidden_dim, head_dim=self.head_dim, num_heads=self.num_heads,
                                 dropout=self.dropout, mask=False)
@@ -176,6 +183,23 @@ class DecoderLayer(nn.Module):
             self.enc_dec_mha = LinRFAMHA(hidden_dim=self.hidden_dim, head_dim=self.head_dim, num_heads=self.num_heads,
                                       dropout=self.dropout, mask=False, sequence_length=self.sequence_length,
                                       downsampling_k=self.downsampling_k)
+        elif self.attention_type == "LinearMHA":
+            self.masked_mha = LinearMHA(hidden_dim=self.hidden_dim, head_dim=self.head_dim, num_heads=self.num_heads,
+                                        dropout=self.dropout, mask=True, sequence_length=self.sequence_length,
+                                        downsampling_k=self.downsampling_k)
+
+            self.enc_dec_mha = LinearRFAMHA(hidden_dim=self.hidden_dim, head_dim=self.head_dim, num_heads=self.num_heads,
+                                         dropout=self.dropout, mask=False, sequence_length=self.sequence_length,
+                                         downsampling_k=self.downsampling_k)
+        elif self.attention_type == "LinLinearMHA":
+            self.masked_mha = LinLinearMHA(hidden_dim=self.hidden_dim, head_dim=self.head_dim, num_heads=self.num_heads,
+                                        dropout=self.dropout, mask=True, sequence_length=self.sequence_length,
+                                        downsampling_k=self.downsampling_k)
+
+            self.enc_dec_mha = LinLinearRFAMHA(hidden_dim=self.hidden_dim, head_dim=self.head_dim, num_heads=self.num_heads,
+                                         dropout=self.dropout, mask=False, sequence_length=self.sequence_length,
+                                         downsampling_k=self.downsampling_k)
+
         else: ## Default to Vanilla Attention.
             self.masked_mha = VanillaMHA(hidden_dim=self.hidden_dim, head_dim=self.head_dim, num_heads=self.num_heads, 
                                         dropout=self.dropout, mask=True)
@@ -290,7 +314,7 @@ sequence_length = 128
 ffn_size = 10
 num_layers = 2
 vocabulary_size = 10
-attnetion_type = "RFAMHA"
+attnetion_type = "LinLinearMHA"
 downsampling_k = 3
 batch_size = 2
 

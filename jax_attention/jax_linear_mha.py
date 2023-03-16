@@ -25,6 +25,7 @@ class MHA(nn.Module):
     dropout : float
     mask : bool
     sequence_length : int
+    downsampling_k : int = 64
     eps: float = 1e-6
 
     """
